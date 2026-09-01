@@ -16,19 +16,19 @@
 <meta name="apple-mobile-web-app-title" content="チェック">
 <style>
 :root{
-  --bg:#0d1117; --card:#1a222c; --card2:#232e3a; --line:#3a4855;
-  --fg:#ffffff; --muted:#a9bccd;
-  --ok:#22d37a; --ok-bg:#0d3b26; --ok-line:#22d37a;
-  --accent:#4da3ff; --danger:#ff5252; --warn:#ffb020;
-  --bar-h:76px;
-  --radius:14px;
+  --bg:#0d1117; --card:#161d26; --card2:#202b36; --line:#333f4c;
+  --fg:#f2f6fa; --muted:#93a6b8;
+  --ok:#22d37a; --ok-bg:#0e3222; --ok-line:#1f9d5e;
+  --skip:#e6a640; --skip-bg:#2a2116; --skip-line:#8a6524;
+  --accent:#4da3ff; --danger:#ff5252;
+  --bar-h:60px; --radius:12px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
 body{
   background:var(--bg); color:var(--fg);
   font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
-  font-size:17px; line-height:1.45;
+  font-size:15px; line-height:1.4;
   -webkit-text-size-adjust:100%;
   overscroll-behavior-y:contain;
   padding-bottom:calc(var(--bar-h) + env(safe-area-inset-bottom));
@@ -39,130 +39,140 @@ button{cursor:pointer}
 /* ---------- ヘッダー ---------- */
 #hdr{
   position:sticky; top:0; z-index:20;
-  background:linear-gradient(180deg,#0d1117 78%,rgba(13,17,23,.0));
-  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background:linear-gradient(180deg,#0d1117 82%,rgba(13,17,23,0));
+  padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
 }
-.h-row{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
-.h-title{font-size:24px; font-weight:800; letter-spacing:.02em; margin:0}
-.h-sub{font-size:15px; color:var(--muted)}
-.h-count{margin-left:auto; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums}
+.h-row{display:flex; align-items:baseline; gap:8px}
+.h-title{font-size:18px; font-weight:700; letter-spacing:.01em; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.h-sub{font-size:12px; color:var(--muted); margin-top:5px}
+.h-count{margin-left:auto; font-size:17px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
 .h-count.done{color:var(--ok)}
 
 /* ---------- プログレスバー ---------- */
-.track{height:12px; border-radius:99px; background:#0a0e13; border:1px solid var(--line); overflow:hidden; margin-top:10px}
-.fill{height:100%; background:var(--ok); width:0%; transition:width .18s ease}
-.fill.part{background:var(--warn)}
+.track{height:6px; border-radius:99px; background:#080b0f; border:1px solid var(--line); overflow:hidden; margin-top:8px; display:flex}
+.fill{height:100%; background:var(--ok); width:0%; transition:width .16s ease}
+.fill.skip{background:var(--skip)}
 
 /* ---------- 本体 ---------- */
-main{padding:6px 12px 20px; max-width:720px; margin:0 auto}
-.stack{display:flex; flex-direction:column; gap:12px}
-/* 場面選択は画面いっぱいに広げ、下側（親指の届く範囲）まで大きく取る */
-.stack.grow{min-height:calc(100dvh - var(--hdr-h,112px) - var(--bar-h) - env(safe-area-inset-bottom) - 26px)}
-.stack.grow .scene-btn{flex:1 1 0; display:flex; flex-direction:column; justify-content:center; align-items:stretch; min-height:96px}
-.stack.grow .scene-btn > .top,
-.stack.grow .scene-btn > .track{width:100%}
+main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
+.stack{display:flex; flex-direction:column; gap:8px}
+/* 場面選択は下寄せ（親指の届く範囲に集める） */
+.stack.grow{min-height:calc(100dvh - var(--hdr-h,84px) - var(--bar-h) - env(safe-area-inset-bottom) - 20px); justify-content:center}
 
-/* 場面選択の大ボタン */
+/* 場面選択のボタン */
 .scene-btn{
   display:block; width:100%; text-align:left;
-  background:var(--card); border:2px solid var(--line); border-radius:18px;
-  padding:18px 18px 16px; color:var(--fg);
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:14px 14px 12px; color:var(--fg);
 }
-.scene-btn:active{transform:scale(.99)}
+.scene-btn:active{background:var(--card2)}
 .scene-btn.done{border-color:var(--ok-line); background:var(--ok-bg)}
-.scene-btn .top{display:flex; align-items:center; gap:12px}
-.scene-btn .name{font-size:26px; font-weight:800; letter-spacing:.02em}
-.scene-btn .frac{margin-left:auto; font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
+.scene-btn .top{display:flex; align-items:center; gap:10px}
+.scene-btn .name{font-size:19px; font-weight:700}
+.scene-btn .frac{margin-left:auto; font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
 .scene-btn.done .frac{color:var(--ok)}
-.scene-btn .times{margin-top:8px; font-size:14px; color:var(--muted); font-variant-numeric:tabular-nums}
-.badge-done{
-  display:inline-flex; align-items:center; gap:6px; margin-top:10px;
-  background:var(--ok); color:#04250f; font-weight:800; font-size:14px;
-  padding:4px 10px; border-radius:99px;
-}
+.scene-btn .times{margin-top:7px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums}
 
-/* チェック項目の行 */
+/* ---------- チェック項目 ---------- */
 .item{
-  display:flex; align-items:center; gap:14px; width:100%; text-align:left;
-  min-height:74px; padding:14px 16px;
-  background:var(--card); border:2px solid var(--line); border-radius:var(--radius);
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  min-height:52px; padding:8px 10px;
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
   color:var(--fg);
 }
 .item:active{background:var(--card2)}
 .item.on{background:var(--ok-bg); border-color:var(--ok-line)}
+.item.skipped{background:var(--skip-bg); border-color:var(--skip-line)}
 .box{
-  flex:0 0 auto; width:36px; height:36px; border-radius:9px;
-  border:3px solid var(--muted); background:transparent;
-  display:grid; place-items:center;
+  flex:0 0 auto; width:26px; height:26px; border-radius:7px;
+  border:2px solid var(--muted); background:transparent;
+  display:grid; place-items:center; position:relative;
 }
 .item.on .box{border-color:var(--ok); background:var(--ok)}
-.box svg{width:24px; height:24px; stroke:#04250f; stroke-width:3.4; fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:0}
+.item.skipped .box{border-color:var(--skip); background:transparent}
+.item.skipped .box::after{
+  content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:13px; height:3px; background:var(--skip); border-radius:2px;
+}
+.box svg{width:18px; height:18px; stroke:#04250f; stroke-width:3.6; fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:0}
 .item.on .box svg{opacity:1}
-.item .txt{flex:1; font-size:20px; font-weight:700; line-height:1.35; word-break:break-word}
-.item.on .txt{opacity:.86}
-.item .at{flex:0 0 auto; font-size:15px; color:var(--ok); font-weight:700; font-variant-numeric:tabular-nums}
+.item .txt{flex:1; min-width:0; font-size:16px; font-weight:600; line-height:1.3; word-break:break-word}
+.item.on .txt{opacity:.8}
+.item.skipped .txt{opacity:.6; text-decoration:line-through}
+.item .at{flex:0 0 auto; font-size:12px; color:var(--ok); font-weight:700; font-variant-numeric:tabular-nums}
+.item.skipped .at{color:var(--skip)}
+.skipbtn{
+  flex:0 0 auto; padding:6px 9px; border-radius:9px; font-size:11px; font-weight:800;
+  background:transparent; border:1px solid var(--line); color:var(--muted); line-height:1;
+}
+.skipbtn:active{background:var(--card2)}
+.item.skipped .skipbtn{border-color:var(--skip-line); color:var(--skip)}
 
-.empty{color:var(--muted); text-align:center; padding:40px 10px; font-size:16px}
+.empty{color:var(--muted); text-align:center; padding:32px 10px; font-size:14px}
+.mode-note{font-size:12px; color:var(--muted); padding:2px 2px 6px}
 
 /* ---------- 下部の操作バー ---------- */
 #bar{
   position:fixed; left:0; right:0; bottom:0; z-index:30;
-  display:flex; gap:10px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
-  background:rgba(13,17,23,.96); border-top:1px solid var(--line);
+  display:flex; gap:8px; padding:7px 10px calc(7px + env(safe-area-inset-bottom));
+  background:rgba(13,17,23,.97); border-top:1px solid var(--line);
   backdrop-filter:blur(6px);
 }
 #bar .btn{flex:1}
 .btn{
-  min-height:56px; padding:10px 14px; border-radius:14px;
-  background:var(--card2); border:2px solid var(--line); color:var(--fg);
-  font-size:18px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px;
+  min-height:44px; padding:8px 10px; border-radius:11px;
+  background:var(--card2); border:1px solid var(--line); color:var(--fg);
+  font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;
+  white-space:nowrap;
 }
-.btn:active{background:#2c3946}
-.btn.primary{background:#12406e; border-color:var(--accent)}
-.btn.danger{background:#4a1717; border-color:var(--danger); color:#ffd9d9}
-.btn.grow2{flex:2}
-.btn.sm{min-height:46px; font-size:16px; padding:8px 12px; border-radius:12px; flex:0 0 auto}
-.btn[disabled]{opacity:.45}
+.btn:active{background:#2b3846}
+.btn.primary{background:#123f6d; border-color:var(--accent)}
+.btn.danger{background:#3d1717; border-color:#7d3030; color:#ffcaca}
+.btn.grow2{flex:1.6}
+.btn.sm{min-height:38px; font-size:13px; padding:7px 11px; border-radius:10px; flex:0 0 auto}
+.btn[disabled]{opacity:.4}
+
+/* ---------- 項目エディタ（リスト画面の編集モード / 設定画面 共通） ---------- */
+.edit-card{background:#111823; border:1px solid var(--line); border-radius:11px; padding:7px; margin-top:7px}
+.edit-card input[type=text]{
+  width:100%; padding:9px 10px; font-size:15px;
+  background:#080b0f; color:var(--fg); border:1px solid var(--line); border-radius:9px;
+}
+.edit-tools{display:flex; gap:6px; justify-content:flex-end; margin-top:6px}
+.iconbtn{
+  flex:0 0 auto; width:38px; height:38px; border-radius:9px;
+  background:var(--card2); border:1px solid var(--line); color:var(--fg);
+  font-size:15px; font-weight:800; display:grid; place-items:center;
+}
+.iconbtn:active{background:#2b3846}
+.iconbtn.del{color:#ff9d9d; border-color:#6b2a2a}
+.iconbtn[disabled]{opacity:.28}
+.row-actions{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap}
 
 /* ---------- 設定画面 ---------- */
-.sec{background:var(--card); border:2px solid var(--line); border-radius:16px; padding:14px; margin-bottom:14px}
-.sec h2{margin:0 0 4px; font-size:19px; font-weight:800}
-.sec .hint{margin:0 0 12px; font-size:14px; color:var(--muted); line-height:1.5}
+.sec{background:var(--card); border:1px solid var(--line); border-radius:13px; padding:12px; margin-bottom:10px}
+.sec h2{margin:0 0 3px; font-size:16px; font-weight:700}
+.sec .hint{margin:0 0 10px; font-size:12px; color:var(--muted); line-height:1.5}
 .name-input{
-  width:100%; padding:12px 14px; font-size:20px; font-weight:800;
-  background:#0a0e13; color:var(--fg); border:2px solid var(--line); border-radius:12px;
+  width:100%; padding:10px 12px; font-size:16px; font-weight:700;
+  background:#080b0f; color:var(--fg); border:1px solid var(--line); border-radius:10px;
 }
-.edit-card{background:#111823; border:2px solid var(--line); border-radius:14px; padding:8px; margin-top:8px}
-.edit-card input[type=text]{
-  width:100%; padding:12px; font-size:17px;
-  background:#0a0e13; color:var(--fg); border:2px solid var(--line); border-radius:12px;
-}
-.edit-tools{display:flex; gap:8px; justify-content:flex-end; margin-top:6px}
-.iconbtn{
-  flex:0 0 auto; width:46px; height:46px; border-radius:11px;
-  background:var(--card2); border:2px solid var(--line); color:var(--fg);
-  font-size:19px; font-weight:800; display:grid; place-items:center;
-}
-.iconbtn:active{background:#2c3946}
-.iconbtn.del{color:#ff9d9d; border-color:#6b2a2a}
-.iconbtn[disabled]{opacity:.3}
-.row-actions{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
-.kv{display:flex; justify-content:space-between; gap:12px; font-size:15px; color:var(--muted); padding:6px 0}
+.kv{display:flex; justify-content:space-between; gap:12px; font-size:13px; color:var(--muted); padding:5px 0}
 .kv b{color:var(--fg); font-weight:700}
 
 /* ---------- モーダル / トースト ---------- */
-#modal{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:18px; background:rgba(0,0,0,.72)}
+#modal{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:16px; background:rgba(0,0,0,.74)}
 #modal[hidden]{display:none}
-.sheet{width:100%; max-width:420px; background:var(--card); border:2px solid var(--line); border-radius:18px; padding:18px}
-.sheet h3{margin:0 0 8px; font-size:21px; font-weight:800}
-.sheet p{margin:0 0 16px; font-size:16px; color:var(--muted); line-height:1.6; white-space:pre-wrap}
-.sheet .acts{display:flex; gap:10px}
+.sheet{width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px}
+.sheet h3{margin:0 0 6px; font-size:17px; font-weight:700}
+.sheet p{margin:0 0 14px; font-size:14px; color:var(--muted); line-height:1.55; white-space:pre-wrap}
+.sheet .acts{display:flex; gap:8px}
 .sheet .acts .btn{flex:1}
 #toast{
   position:fixed; left:50%; transform:translateX(-50%);
-  bottom:calc(var(--bar-h) + 16px + env(safe-area-inset-bottom)); z-index:70;
-  background:#f2f7ff; color:#0d1117; font-weight:800; font-size:16px;
-  padding:12px 18px; border-radius:99px; box-shadow:0 8px 26px rgba(0,0,0,.5);
+  bottom:calc(var(--bar-h) + 14px + env(safe-area-inset-bottom)); z-index:70;
+  background:#eef4fb; color:#0d1117; font-weight:700; font-size:14px;
+  padding:10px 15px; border-radius:99px; box-shadow:0 8px 24px rgba(0,0,0,.5);
   max-width:88vw; text-align:center; display:none;
 }
 #toast.show{display:block}
@@ -195,7 +205,7 @@ const KEEP_DAYS      = 60;  // チェック履歴の保持日数
 function defaultData() {
   const mk = (name, items) => ({ id: uid(), name, items: items.map(t => ({ id: uid(), text: t })) });
   return {
-    version: 1,
+    version: 2,
     settings: { keepAwake: true },
     scenes: [
       mk('出発前', [
@@ -224,7 +234,7 @@ function defaultData() {
         '明日の指示を確認した',
       ]),
     ],
-    // log[業務日][場面ID][項目ID] = チェックした時刻(epoch ms)
+    // log[業務日][場面ID][項目ID] = { at: 時刻(epoch ms), skip: true(スキップの場合) }
     log: {},
   };
 }
@@ -276,7 +286,7 @@ function isValidData(o) {
 
 function normalize(o) {
   const d = {
-    version: 1,
+    version: 2,
     settings: Object.assign({ keepAwake: true }, o.settings || {}),
     scenes: o.scenes.map(s => ({
       id: s.id || uid(),
@@ -293,9 +303,13 @@ function normalize(o) {
     for (const [sid, items] of Object.entries(scenes)) {
       if (!items || typeof items !== 'object') continue;
       const ii = {};
-      for (const [iid, at] of Object.entries(items)) {
-        const n = Number(at);
-        if (Number.isFinite(n) && n > 0) ii[iid] = n;
+      for (const [iid, v] of Object.entries(items)) {
+        // v1 は数値（チェックした時刻）だけだった。v2 は { at, skip }。
+        const at = Number(typeof v === 'object' && v ? v.at : v);
+        if (!Number.isFinite(at) || at <= 0) continue;
+        const e = { at };
+        if (typeof v === 'object' && v && v.skip) e.skip = true;
+        ii[iid] = e;
       }
       if (Object.keys(ii).length) dd[sid] = ii;
     }
@@ -356,24 +370,46 @@ function sceneLog(sceneId, day = today) {
   if (!dl[sceneId]) dl[sceneId] = {};
   return dl[sceneId];
 }
-function isChecked(sceneId, itemId) {
+/* 1項目の状態は次の3つ。entry が無ければ「未」。
+   { at }             … チェック済み
+   { at, skip:true }  … スキップ                                        */
+function entryOf(sceneId, itemId) {
   const d = state.log[today];
-  return !!(d && d[sceneId] && d[sceneId][itemId]);
+  return (d && d[sceneId] && d[sceneId][itemId]) || null;
 }
-function checkedAt(sceneId, itemId) {
-  const d = state.log[today];
-  return (d && d[sceneId] && d[sceneId][itemId]) || 0;
-}
+function isChecked(sceneId, itemId) { const e = entryOf(sceneId, itemId); return !!e && !e.skip; }
+function isSkipped(sceneId, itemId) { const e = entryOf(sceneId, itemId); return !!e && !!e.skip; }
+function checkedAt(sceneId, itemId) { const e = entryOf(sceneId, itemId); return e ? e.at : 0; }
+
 function toggleItem(sceneId, itemId) {
   const sl = sceneLog(sceneId);
-  if (sl[itemId]) delete sl[itemId]; else sl[itemId] = Date.now();
+  const e = sl[itemId];
+  if (e && !e.skip) delete sl[itemId];       // チェック済み → 未
+  else sl[itemId] = { at: Date.now() };      // 未・スキップ → チェック済み
   save();
 }
+function toggleSkip(sceneId, itemId) {
+  const sl = sceneLog(sceneId);
+  const e = sl[itemId];
+  if (e && e.skip) delete sl[itemId];                  // スキップ → 未
+  else sl[itemId] = { at: Date.now(), skip: true };    // 未・チェック済み → スキップ
+  save();
+}
+
 function progress(scene) {
   const total = scene.items.length;
-  let done = 0;
-  for (const it of scene.items) if (isChecked(scene.id, it.id)) done++;
-  return { done, total, pct: total ? Math.round(done / total * 100) : 0, all: total > 0 && done === total };
+  let done = 0, skipped = 0;
+  for (const it of scene.items) {
+    if (isChecked(scene.id, it.id)) done++;
+    else if (isSkipped(scene.id, it.id)) skipped++;
+  }
+  const handled = done + skipped;   // 「もう触らなくていい」件数
+  return {
+    done, skipped, handled, total,
+    pct: total ? Math.round(done / total * 100) : 0,
+    skipPct: total ? Math.round(skipped / total * 100) : 0,
+    all: total > 0 && handled === total,
+  };
 }
 function sceneTimes(scene) {
   const ts = scene.items.map(it => checkedAt(scene.id, it.id)).filter(Boolean).sort((a, b) => a - b);
@@ -457,39 +493,58 @@ addEventListener('hashchange', () => { checkDayRollover(); render(); });
 
 const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="4.5,12.5 10,18 19.5,6.5"/></svg>';
 
-function render() {
+let editMode = false;   // チェックリスト画面の「編集」モード
+
+function render(resetScroll = true) {
   const r = route();
   if (r.view === 'scene' && !findScene(r.id)) { go('#/'); return; }
+  if (r.view !== 'scene') editMode = false;
   if (r.view === 'scene') renderScene(findScene(r.id));
   else if (r.view === 'settings') renderSettings();
   else renderHome();
-  document.documentElement.scrollTop = 0;
+  if (resetScroll) document.documentElement.scrollTop = 0;
+}
+/* スクロール位置を保ったまま今の画面を作り直す */
+function rerender() {
+  const y = window.scrollY;
+  render(false);
+  window.scrollTo(0, y);
+}
+
+/* 済み（緑）とスキップ（橙）を並べた進捗バー */
+function trackHTML(p) {
+  return `<div class="track">
+    <div class="fill" style="width:${p.pct}%"></div>
+    <div class="fill skip" style="width:${p.skipPct}%"></div>
+  </div>`;
 }
 
 /* ---------------- 1. 場面選択 ---------------- */
 function renderHome() {
   hdr.innerHTML = `
-    <div class="h-row">
-      <h1 class="h-title">納品チェックリスト</h1>
-    </div>
-    <div class="h-sub">本日 ${esc(dateLabel(today))} ／ 午前${DAY_START_HOUR}時で日付が切り替わります</div>`;
+    <div class="h-row"><h1 class="h-title">納品チェックリスト</h1></div>
+    <div class="h-sub">${esc(dateLabel(today))} ／ 午前${DAY_START_HOUR}時で日付が切り替わります</div>`;
 
   main.innerHTML = `<div class="stack grow">` + state.scenes.map(s => {
     const p = progress(s), t = sceneTimes(s);
+    const note = [
+      p.all ? '完了' : '',
+      p.skipped ? `スキップ${p.skipped}` : '',
+      t ? `${hhmm(t.first)} → ${hhmm(t.last)}（${t.min}分）` : '',
+    ].filter(Boolean).join(' ／ ');
     return `
       <button class="scene-btn ${p.all ? 'done' : ''}" data-go="${esc(s.id)}">
         <div class="top">
           <span class="name">${esc(s.name)}</span>
-          <span class="frac">${p.done}/${p.total}</span>
+          <span class="frac">${p.handled}/${p.total}</span>
         </div>
-        <div class="track"><div class="fill ${p.all ? '' : 'part'}" style="width:${p.pct}%"></div></div>
-        ${p.all ? `<div><span class="badge-done">${CHECK_SVG.replace('<svg', '<svg style="width:16px;height:16px;stroke:#04250f;stroke-width:3.4;fill:none"')} 完了</span></div>` : ''}
-        ${t ? `<div class="times">${hhmm(t.first)} → ${hhmm(t.last)}（${t.min}分・${t.n}件）</div>` : ''}
+        ${trackHTML(p)}
+        ${note ? `<div class="times">${esc(note)}</div>` : ''}
       </button>`;
   }).join('') + `</div>`;
 
   bar.innerHTML = `<button class="btn" data-act="settings">⚙ 設定</button>`;
-  // ボタンを画面いっぱいに広げるため、ヘッダーの実寸をCSSへ渡す
+  // 下寄せの高さを決めるため、ヘッダーの実寸をCSSへ渡す
   requestAnimationFrame(() => {
     document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
   });
@@ -498,45 +553,87 @@ function renderHome() {
 /* ---------------- 2. チェックリスト ---------------- */
 function sceneHeaderHTML(scene) {
   const p = progress(scene), t = sceneTimes(scene);
+  const sub = [
+    dateLabel(today),
+    p.skipped ? `スキップ${p.skipped}` : '',
+    t ? `${hhmm(t.first)} → ${hhmm(t.last)}（${t.min}分）` : 'まだ記録がありません',
+  ].filter(Boolean).join(' ／ ');
   return `
     <div class="h-row">
       <h1 class="h-title">${esc(scene.name)}</h1>
-      <span class="h-count ${p.all ? 'done' : ''}">${p.done}/${p.total}</span>
+      <span class="h-count ${p.all ? 'done' : ''}">${p.handled}/${p.total}</span>
     </div>
-    <div class="track"><div class="fill ${p.all ? '' : 'part'}" style="width:${p.pct}%"></div></div>
-    <div class="h-sub" style="margin-top:8px">
-      ${esc(dateLabel(today))}${t ? ` ／ ${hhmm(t.first)} → ${hhmm(t.last)}（${t.min}分）` : ' ／ まだチェックがありません'}
+    ${trackHTML(p)}
+    <div class="h-sub">${esc(sub)}</div>`;
+}
+
+/* 項目エディタ（チェックリスト画面の編集モードと設定画面で共用） */
+function itemEditorHTML(scene) {
+  return scene.items.map((it, i) => `
+    <div class="edit-card">
+      <input type="text" value="${esc(it.text)}" data-edit="item" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+             aria-label="項目の内容" maxlength="80" placeholder="項目を入力">
+      <div class="edit-tools">
+        <button class="iconbtn" data-act="up" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+                aria-label="上へ移動" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button class="iconbtn" data-act="down" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+                aria-label="下へ移動" ${i === scene.items.length - 1 ? 'disabled' : ''}>▼</button>
+        <button class="iconbtn del" data-act="del" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+                aria-label="この項目を削除">✕</button>
+      </div>
+    </div>`).join('') + `
+    <div class="row-actions">
+      <button class="btn sm primary" data-act="add" data-scene="${esc(scene.id)}">＋ 項目を追加</button>
+    </div>`;
+}
+
+function itemRowHTML(scene, it) {
+  const on = isChecked(scene.id, it.id), sk = isSkipped(scene.id, it.id);
+  const at = checkedAt(scene.id, it.id);
+  return `
+    <div class="item ${on ? 'on' : ''} ${sk ? 'skipped' : ''}" role="checkbox" aria-checked="${on}" tabindex="0"
+         data-item="${esc(it.id)}" data-scene="${esc(scene.id)}">
+      <span class="box">${CHECK_SVG}</span>
+      <span class="txt">${esc(it.text)}</span>
+      <span class="at">${at ? hhmm(at) : ''}</span>
+      <button class="skipbtn" data-act="skip" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+              aria-label="${sk ? 'スキップを取り消す' : 'この項目をスキップ'}">${sk ? '戻す' : 'スキップ'}</button>
     </div>`;
 }
 
 function renderScene(scene) {
   hdr.innerHTML = sceneHeaderHTML(scene);
 
+  if (editMode) {
+    main.innerHTML = `<p class="mode-note">項目を編集中です。▲▼で並べ替え、✕で削除。</p>` + itemEditorHTML(scene);
+    bar.innerHTML = `<button class="btn primary" data-act="editdone">✓ 編集を終わる</button>`;
+    return;
+  }
+
   main.innerHTML = scene.items.length
-    ? `<div class="stack">` + scene.items.map(it => {
-        const on = isChecked(scene.id, it.id), at = checkedAt(scene.id, it.id);
-        return `
-          <button class="item ${on ? 'on' : ''}" role="checkbox" aria-checked="${on}"
-                  data-item="${esc(it.id)}" data-scene="${esc(scene.id)}">
-            <span class="box">${CHECK_SVG}</span>
-            <span class="txt">${esc(it.text)}</span>
-            <span class="at">${at ? hhmm(at) : ''}</span>
-          </button>`;
-      }).join('') + `</div>`
-    : `<p class="empty">項目がありません。<br>下の「設定」から追加してください。</p>`;
+    ? `<div class="stack">` + scene.items.map(it => itemRowHTML(scene, it)).join('') + `</div>`
+    : `<p class="empty">項目がありません。<br>下の「編集」から追加してください。</p>`;
 
   bar.innerHTML = `
-    <button class="btn grow2" data-act="home">← 場面選択</button>
+    <button class="btn grow2" data-act="home">← 場面</button>
+    <button class="btn" data-act="edit">✎ 編集</button>
     <button class="btn danger" data-act="reset" data-scene="${esc(scene.id)}">リセット</button>`;
 }
 
 /* チェック時は画面を作り直さず、その行とヘッダーだけ更新（速く・スクロール位置も保つ） */
-function refreshRow(btn, scene, itemId) {
-  const on = isChecked(scene.id, itemId), at = checkedAt(scene.id, itemId);
-  btn.classList.toggle('on', on);
-  btn.setAttribute('aria-checked', String(on));
-  const t = btn.querySelector('.at');
+function refreshRow(row, scene, itemId) {
+  const on = isChecked(scene.id, itemId), sk = isSkipped(scene.id, itemId);
+  const at = checkedAt(scene.id, itemId);
+  row.classList.toggle('on', on);
+  row.classList.toggle('skipped', sk);
+  row.setAttribute('aria-checked', String(on));
+  const t = row.querySelector('.at');
   if (t) t.textContent = at ? hhmm(at) : '';
+  const sb = row.querySelector('.skipbtn');
+  if (sb) {
+    sb.textContent = sk ? '戻す' : 'スキップ';
+    sb.setAttribute('aria-label', sk ? 'スキップを取り消す' : 'この項目をスキップ');
+  }
   hdr.innerHTML = sceneHeaderHTML(scene);
 }
 
@@ -554,23 +651,8 @@ function renderSettings() {
         <p class="hint" style="margin:0 0 8px">場面選択画面に出す名前</p>
         <input class="name-input" type="text" value="${esc(s.name)}" data-edit="scene" data-scene="${esc(s.id)}"
                aria-label="場面の名前" maxlength="30">
-        <p class="hint" style="margin:12px 0 0">項目（${s.items.length}件）／ ▲▼で並べ替え</p>
-        ${s.items.map((it, i) => `
-          <div class="edit-card">
-            <input type="text" value="${esc(it.text)}" data-edit="item" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
-                   aria-label="項目の内容" maxlength="80">
-            <div class="edit-tools">
-              <button class="iconbtn" data-act="up" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
-                      aria-label="上へ移動" ${i === 0 ? 'disabled' : ''}>▲</button>
-              <button class="iconbtn" data-act="down" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
-                      aria-label="下へ移動" ${i === s.items.length - 1 ? 'disabled' : ''}>▼</button>
-              <button class="iconbtn del" data-act="del" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
-                      aria-label="この項目を削除">✕</button>
-            </div>
-          </div>`).join('')}
-        <div class="row-actions">
-          <button class="btn sm primary" data-act="add" data-scene="${esc(s.id)}">＋ 項目を追加</button>
-        </div>
+        <p class="hint" style="margin:10px 0 0">項目（${s.items.length}件）／ ▲▼で並べ替え</p>
+        ${itemEditorHTML(s)}
       </section>`).join('') + `
 
     <section class="sec">
@@ -581,7 +663,7 @@ function renderSettings() {
         <button class="btn sm primary" data-act="export">⬇ JSONに書き出す</button>
         <button class="btn sm" data-act="import">⬆ JSONを読み込む</button>
       </div>
-      <div class="kv" style="margin-top:12px"><span>チェック項目</span><b>${items}件</b></div>
+      <div class="kv" style="margin-top:10px"><span>チェック項目</span><b>${items}件</b></div>
       <div class="kv"><span>記録が残っている日数</span><b>${days}日分</b></div>
     </section>
 
@@ -601,7 +683,7 @@ function renderSettings() {
       <div class="kv"><span>データの保存先</span><b>この端末の中だけ</b></div>
       <div class="kv"><span>日付の区切り</span><b>午前${DAY_START_HOUR}時</b></div>
       <div class="kv"><span>履歴の保持</span><b>直近${KEEP_DAYS}日</b></div>
-      <div class="row-actions" style="margin-top:14px">
+      <div class="row-actions" style="margin-top:12px">
         <button class="btn sm danger" data-act="wipe">全データを消去</button>
       </div>
     </section>`;
@@ -615,6 +697,19 @@ function renderSettings() {
 document.addEventListener('click', async (e) => {
   const goBtn = e.target.closest('[data-go]');
   if (goBtn) { go('#/scene/' + encodeURIComponent(goBtn.dataset.go)); return; }
+
+  // 行の中の「スキップ」ボタン（行タップより先に処理する）
+  const skipBtn = e.target.closest('.skipbtn');
+  if (skipBtn) {
+    const scene = findScene(skipBtn.dataset.scene);
+    const row = skipBtn.closest('.item');
+    if (!scene || !row) return;
+    if (checkDayRollover()) return;
+    toggleSkip(scene.id, skipBtn.dataset.item);
+    refreshRow(row, scene, skipBtn.dataset.item);
+    if (navigator.vibrate) navigator.vibrate(12);
+    return;
+  }
 
   const item = e.target.closest('.item');
   if (item) {
@@ -636,19 +731,30 @@ document.addEventListener('click', async (e) => {
     case 'home':     go('#/'); break;
     case 'settings': go('#/settings'); break;
 
+    case 'edit':     editMode = true;  render(); break;
+    case 'editdone': {
+      editMode = false;
+      // 空のまま残った項目は保存しない
+      for (const sc of state.scenes) sc.items = sc.items.filter(it => it.text.trim() !== '');
+      save(true);
+      render();
+      break;
+    }
+
     case 'reset': {
       if (!scene) break;
       const p = progress(scene);
-      if (p.done === 0) { toast('チェックはまだありません'); break; }
+      if (p.handled === 0) { toast('まだ記録がありません'); break; }
+      const detail = p.skipped ? `チェック ${p.done}件・スキップ ${p.skipped}件` : `チェック ${p.done}件`;
       const ok = await confirmDialog({
         title: `「${scene.name}」をリセット`,
-        body: `本日のチェック ${p.done}件 と、その時刻の記録を消します。\nこの操作は取り消せません。`,
+        body: `本日の${detail} と、その時刻の記録を消します。\nこの操作は取り消せません。`,
         ok: 'リセットする', danger: true,
       });
       if (!ok) break;
       delete dayLog()[scene.id];
       save(true);
-      renderScene(scene);
+      render(false);
       toast(`「${scene.name}」をリセットしました`);
       break;
     }
@@ -657,7 +763,7 @@ document.addEventListener('click', async (e) => {
       if (!scene) break;
       scene.items.push({ id: uid(), text: '' });
       save(true);
-      renderSettings();
+      rerender();
       const inputs = main.querySelectorAll(`[data-edit="item"][data-scene="${CSS.escape(scene.id)}"]`);
       const last = inputs[inputs.length - 1];
       if (last) { last.focus(); last.scrollIntoView({ block: 'center' }); }
@@ -670,11 +776,9 @@ document.addEventListener('click', async (e) => {
       const i = scene.items.findIndex(it => it.id === btn.dataset.item);
       const j = act === 'up' ? i - 1 : i + 1;
       if (i < 0 || j < 0 || j >= scene.items.length) break;
-      const y = window.scrollY;
       [scene.items[i], scene.items[j]] = [scene.items[j], scene.items[i]];
       save(true);
-      renderSettings();
-      window.scrollTo(0, y);
+      rerender();
       break;
     }
 
@@ -687,13 +791,11 @@ document.addEventListener('click', async (e) => {
         ok: '削除する', danger: true,
       });
       if (!ok) break;
-      const y = window.scrollY;
       scene.items = scene.items.filter(x => x.id !== it.id);
       // 過去のチェック記録からも取り除く
       for (const day of Object.values(state.log)) if (day[scene.id]) delete day[scene.id][it.id];
       save(true);
-      renderSettings();
-      window.scrollTo(0, y);
+      rerender();
       break;
     }
 
@@ -707,7 +809,7 @@ document.addEventListener('click', async (e) => {
         await releaseWakeLock();
         toast('通常どおりスリープします');
       }
-      const y = window.scrollY; renderSettings(); window.scrollTo(0, y);
+      rerender();
       break;
     }
 
@@ -729,6 +831,15 @@ document.addEventListener('click', async (e) => {
       break;
     }
   }
+});
+
+/* 行はdiv（中にスキップボタンを置くため）なので、Enter / Space を自前で拾う */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const row = e.target.closest && e.target.closest('.item');
+  if (!row) return;
+  e.preventDefault();
+  row.click();
 });
 
 /* テキスト編集（再描画せずに保存＝入力中にカーソルが飛ばない） */
