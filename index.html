@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>納品チェックリスト</title>
+<meta name="description" content="納品業務の場面別チェックリスト（端末内保存・オフライン動作）">
+<meta name="theme-color" content="#0d1117">
+<meta name="color-scheme" content="dark">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="チェック">
+<style>
+:root{
+  --bg:#0d1117; --card:#1a222c; --card2:#232e3a; --line:#3a4855;
+  --fg:#ffffff; --muted:#a9bccd;
+  --ok:#22d37a; --ok-bg:#0d3b26; --ok-line:#22d37a;
+  --accent:#4da3ff; --danger:#ff5252; --warn:#ffb020;
+  --bar-h:76px;
+  --radius:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:system-ui,-apple-system,"Segoe UI","Noto Sans JP","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+  font-size:17px; line-height:1.45;
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior-y:contain;
+  padding-bottom:calc(var(--bar-h) + env(safe-area-inset-bottom));
+}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+
+/* ---------- ヘッダー ---------- */
+#hdr{
+  position:sticky; top:0; z-index:20;
+  background:linear-gradient(180deg,#0d1117 78%,rgba(13,17,23,.0));
+  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
+}
+.h-row{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+.h-title{font-size:24px; font-weight:800; letter-spacing:.02em; margin:0}
+.h-sub{font-size:15px; color:var(--muted)}
+.h-count{margin-left:auto; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums}
+.h-count.done{color:var(--ok)}
+
+/* ---------- プログレスバー ---------- */
+.track{height:12px; border-radius:99px; background:#0a0e13; border:1px solid var(--line); overflow:hidden; margin-top:10px}
+.fill{height:100%; background:var(--ok); width:0%; transition:width .18s ease}
+.fill.part{background:var(--warn)}
+
+/* ---------- 本体 ---------- */
+main{padding:6px 12px 20px; max-width:720px; margin:0 auto}
+.stack{display:flex; flex-direction:column; gap:12px}
+/* 場面選択は画面いっぱいに広げ、下側（親指の届く範囲）まで大きく取る */
+.stack.grow{min-height:calc(100dvh - var(--hdr-h,112px) - var(--bar-h) - env(safe-area-inset-bottom) - 26px)}
+.stack.grow .scene-btn{flex:1 1 0; display:flex; flex-direction:column; justify-content:center; align-items:stretch; min-height:96px}
+.stack.grow .scene-btn > .top,
+.stack.grow .scene-btn > .track{width:100%}
+
+/* 場面選択の大ボタン */
+.scene-btn{
+  display:block; width:100%; text-align:left;
+  background:var(--card); border:2px solid var(--line); border-radius:18px;
+  padding:18px 18px 16px; color:var(--fg);
+}
+.scene-btn:active{transform:scale(.99)}
+.scene-btn.done{border-color:var(--ok-line); background:var(--ok-bg)}
+.scene-btn .top{display:flex; align-items:center; gap:12px}
+.scene-btn .name{font-size:26px; font-weight:800; letter-spacing:.02em}
+.scene-btn .frac{margin-left:auto; font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
+.scene-btn.done .frac{color:var(--ok)}
+.scene-btn .times{margin-top:8px; font-size:14px; color:var(--muted); font-variant-numeric:tabular-nums}
+.badge-done{
+  display:inline-flex; align-items:center; gap:6px; margin-top:10px;
+  background:var(--ok); color:#04250f; font-weight:800; font-size:14px;
+  padding:4px 10px; border-radius:99px;
+}
+
+/* チェック項目の行 */
+.item{
+  display:flex; align-items:center; gap:14px; width:100%; text-align:left;
+  min-height:74px; padding:14px 16px;
+  background:var(--card); border:2px solid var(--line); border-radius:var(--radius);
+  color:var(--fg);
+}
+.item:active{background:var(--card2)}
+.item.on{background:var(--ok-bg); border-color:var(--ok-line)}
+.box{
+  flex:0 0 auto; width:36px; height:36px; border-radius:9px;
+  border:3px solid var(--muted); background:transparent;
+  display:grid; place-items:center;
+}
+.item.on .box{border-color:var(--ok); background:var(--ok)}
+.box svg{width:24px; height:24px; stroke:#04250f; stroke-width:3.4; fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:0}
+.item.on .box svg{opacity:1}
+.item .txt{flex:1; font-size:20px; font-weight:700; line-height:1.35; word-break:break-word}
+.item.on .txt{opacity:.86}
+.item .at{flex:0 0 auto; font-size:15px; color:var(--ok); font-weight:700; font-variant-numeric:tabular-nums}
+
+.empty{color:var(--muted); text-align:center; padding:40px 10px; font-size:16px}
+
+/* ---------- 下部の操作バー ---------- */
+#bar{
+  position:fixed; left:0; right:0; bottom:0; z-index:30;
+  display:flex; gap:10px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(13,17,23,.96); border-top:1px solid var(--line);
+  backdrop-filter:blur(6px);
+}
+#bar .btn{flex:1}
+.btn{
+  min-height:56px; padding:10px 14px; border-radius:14px;
+  background:var(--card2); border:2px solid var(--line); color:var(--fg);
+  font-size:18px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.btn:active{background:#2c3946}
+.btn.primary{background:#12406e; border-color:var(--accent)}
+.btn.danger{background:#4a1717; border-color:var(--danger); color:#ffd9d9}
+.btn.grow2{flex:2}
+.btn.sm{min-height:46px; font-size:16px; padding:8px 12px; border-radius:12px; flex:0 0 auto}
+.btn[disabled]{opacity:.45}
+
+/* ---------- 設定画面 ---------- */
+.sec{background:var(--card); border:2px solid var(--line); border-radius:16px; padding:14px; margin-bottom:14px}
+.sec h2{margin:0 0 4px; font-size:19px; font-weight:800}
+.sec .hint{margin:0 0 12px; font-size:14px; color:var(--muted); line-height:1.5}
+.name-input{
+  width:100%; padding:12px 14px; font-size:20px; font-weight:800;
+  background:#0a0e13; color:var(--fg); border:2px solid var(--line); border-radius:12px;
+}
+.edit-card{background:#111823; border:2px solid var(--line); border-radius:14px; padding:8px; margin-top:8px}
+.edit-card input[type=text]{
+  width:100%; padding:12px; font-size:17px;
+  background:#0a0e13; color:var(--fg); border:2px solid var(--line); border-radius:12px;
+}
+.edit-tools{display:flex; gap:8px; justify-content:flex-end; margin-top:6px}
+.iconbtn{
+  flex:0 0 auto; width:46px; height:46px; border-radius:11px;
+  background:var(--card2); border:2px solid var(--line); color:var(--fg);
+  font-size:19px; font-weight:800; display:grid; place-items:center;
+}
+.iconbtn:active{background:#2c3946}
+.iconbtn.del{color:#ff9d9d; border-color:#6b2a2a}
+.iconbtn[disabled]{opacity:.3}
+.row-actions{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
+.kv{display:flex; justify-content:space-between; gap:12px; font-size:15px; color:var(--muted); padding:6px 0}
+.kv b{color:var(--fg); font-weight:700}
+
+/* ---------- モーダル / トースト ---------- */
+#modal{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:18px; background:rgba(0,0,0,.72)}
+#modal[hidden]{display:none}
+.sheet{width:100%; max-width:420px; background:var(--card); border:2px solid var(--line); border-radius:18px; padding:18px}
+.sheet h3{margin:0 0 8px; font-size:21px; font-weight:800}
+.sheet p{margin:0 0 16px; font-size:16px; color:var(--muted); line-height:1.6; white-space:pre-wrap}
+.sheet .acts{display:flex; gap:10px}
+.sheet .acts .btn{flex:1}
+#toast{
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom:calc(var(--bar-h) + 16px + env(safe-area-inset-bottom)); z-index:70;
+  background:#f2f7ff; color:#0d1117; font-weight:800; font-size:16px;
+  padding:12px 18px; border-radius:99px; box-shadow:0 8px 26px rgba(0,0,0,.5);
+  max-width:88vw; text-align:center; display:none;
+}
+#toast.show{display:block}
+#toast button{background:none;border:0;color:#0b4ea2;font-weight:800;text-decoration:underline;padding:0 0 0 10px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header id="hdr"></header>
+<main id="main"></main>
+<nav id="bar"></nav>
+<div id="modal" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<noscript><p style="padding:20px">このアプリはJavaScriptが必要です。</p></noscript>
+<script>
+(() => {
+'use strict';
+
+/* =========================================================
+   設定値
+   ========================================================= */
+const STORE_KEY     = 'deliveryChecklist.v1';
+const DAY_START_HOUR = 4;   // 業務日の区切り（午前4時）。4時までは前日扱い。
+const KEEP_DAYS      = 60;  // チェック履歴の保持日数
+
+/* =========================================================
+   初期データ（仮。設定画面から自由に差し替えてください）
+   ========================================================= */
+function defaultData() {
+  const mk = (name, items) => ({ id: uid(), name, items: items.map(t => ({ id: uid(), text: t })) });
+  return {
+    version: 1,
+    settings: { keepAwake: true },
+    scenes: [
+      mk('出発前', [
+        '納品書・伝票を持ったか',
+        '商品の数量を照合した',
+        '台車・カゴを積んだ',
+        '保冷剤・カバーを用意した',
+        '端末の充電残量を確認した',
+        '車の鍵・免許証',
+        '本日のルートを確認した',
+      ]),
+      mk('店を出る前', [
+        '検品印・サインをもらった',
+        '空カゴ・返却品を回収した',
+        '返品・欠品を記録した',
+        '冷蔵ケースの扉を閉めた',
+        '店内に忘れ物がないか見た',
+        '次の店へ到着連絡をした',
+      ]),
+      mk('戻った後', [
+        '空カゴ・備品を所定位置へ戻した',
+        '返品を仕分けて棚に戻した',
+        '伝票を提出した（写真も保存）',
+        '台車と保冷剤を片付けた',
+        '端末を充電器に挿した',
+        '明日の指示を確認した',
+      ]),
+    ],
+    // log[業務日][場面ID][項目ID] = チェックした時刻(epoch ms)
+    log: {},
+  };
+}
+
+/* =========================================================
+   小道具
+   ========================================================= */
+const $ = (sel, el = document) => el.querySelector(sel);
+const hdr = $('#hdr'), main = $('#main'), bar = $('#bar');
+
+function uid() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function hhmm(ms) { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+/* ---- 業務日（午前4時区切り） ---- */
+function businessDateKey(d = new Date()) {
+  const t = new Date(d.getTime() - DAY_START_HOUR * 3600000);
+  return t.getFullYear() + '-' + pad2(t.getMonth() + 1) + '-' + pad2(t.getDate());
+}
+const WD = ['日','月','火','水','木','金','土'];
+function dateLabel(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return `${m}/${d}(${WD[dt.getDay()]})`;
+}
+function daysBetween(aKey, bKey) {
+  const p = k => { const [y,m,d] = k.split('-').map(Number); return Date.UTC(y, m-1, d); };
+  return Math.round((p(aKey) - p(bKey)) / 86400000);
+}
+
+/* =========================================================
+   保存 / 読み込み
+   ========================================================= */
+let state = null;
+let today = businessDateKey();
+
+function isValidData(o) {
+  return !!o && typeof o === 'object'
+    && Array.isArray(o.scenes)
+    && o.scenes.every(s => s && typeof s.name === 'string' && Array.isArray(s.items))
+    && o.log && typeof o.log === 'object' && !Array.isArray(o.log);
+}
+
+function normalize(o) {
+  const d = {
+    version: 1,
+    settings: Object.assign({ keepAwake: true }, o.settings || {}),
+    scenes: o.scenes.map(s => ({
+      id: s.id || uid(),
+      name: String(s.name),
+      items: (s.items || [])
+        .filter(it => it && typeof it.text === 'string')
+        .map(it => ({ id: it.id || uid(), text: String(it.text) })),
+    })),
+    log: {},
+  };
+  for (const [day, scenes] of Object.entries(o.log || {})) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !scenes || typeof scenes !== 'object') continue;
+    const dd = {};
+    for (const [sid, items] of Object.entries(scenes)) {
+      if (!items || typeof items !== 'object') continue;
+      const ii = {};
+      for (const [iid, at] of Object.entries(items)) {
+        const n = Number(at);
+        if (Number.isFinite(n) && n > 0) ii[iid] = n;
+      }
+      if (Object.keys(ii).length) dd[sid] = ii;
+    }
+    if (Object.keys(dd).length) d.log[day] = dd;
+  }
+  return d;
+}
+
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(STORE_KEY); } catch (e) { /* プライベートモード等 */ }
+  if (!raw) return defaultData();
+  try {
+    const o = JSON.parse(raw);
+    return isValidData(o) ? normalize(o) : defaultData();
+  } catch (e) {
+    console.warn('保存データを読めませんでした', e);
+    return defaultData();
+  }
+}
+
+let saveTimer = null;
+function save(now = false) {
+  const write = () => {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    } catch (e) {
+      toast('保存できませんでした（端末の空き容量を確認してください）');
+      console.error(e);
+    }
+  };
+  if (now) { clearTimeout(saveTimer); write(); return; }
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(write, 250);
+}
+// 画面を閉じる直前に確実に書き込む
+addEventListener('pagehide', () => save(true));
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(true); });
+
+/* 古い履歴を削除（KEEP_DAYS日より前） */
+function pruneLog() {
+  let removed = 0;
+  for (const day of Object.keys(state.log)) {
+    if (daysBetween(today, day) >= KEEP_DAYS) { delete state.log[day]; removed++; }
+  }
+  return removed;
+}
+
+/* =========================================================
+   チェック状態
+   ========================================================= */
+function dayLog(day = today) {
+  if (!state.log[day]) state.log[day] = {};
+  return state.log[day];
+}
+function sceneLog(sceneId, day = today) {
+  const dl = dayLog(day);
+  if (!dl[sceneId]) dl[sceneId] = {};
+  return dl[sceneId];
+}
+function isChecked(sceneId, itemId) {
+  const d = state.log[today];
+  return !!(d && d[sceneId] && d[sceneId][itemId]);
+}
+function checkedAt(sceneId, itemId) {
+  const d = state.log[today];
+  return (d && d[sceneId] && d[sceneId][itemId]) || 0;
+}
+function toggleItem(sceneId, itemId) {
+  const sl = sceneLog(sceneId);
+  if (sl[itemId]) delete sl[itemId]; else sl[itemId] = Date.now();
+  save();
+}
+function progress(scene) {
+  const total = scene.items.length;
+  let done = 0;
+  for (const it of scene.items) if (isChecked(scene.id, it.id)) done++;
+  return { done, total, pct: total ? Math.round(done / total * 100) : 0, all: total > 0 && done === total };
+}
+function sceneTimes(scene) {
+  const ts = scene.items.map(it => checkedAt(scene.id, it.id)).filter(Boolean).sort((a, b) => a - b);
+  if (!ts.length) return null;
+  const first = ts[0], last = ts[ts.length - 1];
+  const min = Math.round((last - first) / 60000);
+  return { first, last, min, n: ts.length };
+}
+function findScene(id) { return state.scenes.find(s => s.id === id) || null; }
+
+/* =========================================================
+   トースト / 確認ダイアログ
+   ========================================================= */
+let toastTimer = null;
+function toast(msg, ms = 2600) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function confirmDialog({ title, body = '', ok = 'OK', cancel = 'やめる', danger = false }) {
+  return new Promise(resolve => {
+    const m = $('#modal');
+    m.innerHTML = `
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <h3>${esc(title)}</h3>
+        ${body ? `<p>${esc(body)}</p>` : ''}
+        <div class="acts">
+          <button class="btn" data-a="cancel">${esc(cancel)}</button>
+          <button class="btn ${danger ? 'danger' : 'primary'}" data-a="ok">${esc(ok)}</button>
+        </div>
+      </div>`;
+    m.hidden = false;
+    const done = v => { m.hidden = true; m.innerHTML = ''; document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') done(false); };
+    document.addEventListener('keydown', onKey);
+    m.onclick = e => {
+      const b = e.target.closest('[data-a]');
+      if (b) return done(b.dataset.a === 'ok');
+      if (e.target === m) done(false);
+    };
+    setTimeout(() => { const b = m.querySelector('[data-a="ok"]'); if (b) b.focus(); }, 0);
+  });
+}
+
+/* =========================================================
+   画面スリープ防止（Wake Lock API）
+   ========================================================= */
+let wakeLock = null;
+async function acquireWakeLock() {
+  if (!state.settings.keepAwake) return;
+  if (!('wakeLock' in navigator)) return;
+  if (wakeLock) return;
+  if (document.visibilityState !== 'visible') return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) { /* 電池セーバー中などは失敗する。無視して良い */ }
+}
+async function releaseWakeLock() {
+  try { if (wakeLock) await wakeLock.release(); } catch (e) {}
+  wakeLock = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { checkDayRollover(); acquireWakeLock(); }
+});
+
+/* =========================================================
+   画面遷移（ハッシュ = Android の戻るボタンが効く）
+   ========================================================= */
+function route() {
+  const h = location.hash || '#/';
+  if (h.startsWith('#/scene/')) return { view: 'scene', id: decodeURIComponent(h.slice('#/scene/'.length)) };
+  if (h === '#/settings') return { view: 'settings' };
+  return { view: 'home' };
+}
+const go = h => { location.hash = h; };
+addEventListener('hashchange', () => { checkDayRollover(); render(); });
+
+const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="4.5,12.5 10,18 19.5,6.5"/></svg>';
+
+function render() {
+  const r = route();
+  if (r.view === 'scene' && !findScene(r.id)) { go('#/'); return; }
+  if (r.view === 'scene') renderScene(findScene(r.id));
+  else if (r.view === 'settings') renderSettings();
+  else renderHome();
+  document.documentElement.scrollTop = 0;
+}
+
+/* ---------------- 1. 場面選択 ---------------- */
+function renderHome() {
+  hdr.innerHTML = `
+    <div class="h-row">
+      <h1 class="h-title">納品チェックリスト</h1>
+    </div>
+    <div class="h-sub">本日 ${esc(dateLabel(today))} ／ 午前${DAY_START_HOUR}時で日付が切り替わります</div>`;
+
+  main.innerHTML = `<div class="stack grow">` + state.scenes.map(s => {
+    const p = progress(s), t = sceneTimes(s);
+    return `
+      <button class="scene-btn ${p.all ? 'done' : ''}" data-go="${esc(s.id)}">
+        <div class="top">
+          <span class="name">${esc(s.name)}</span>
+          <span class="frac">${p.done}/${p.total}</span>
+        </div>
+        <div class="track"><div class="fill ${p.all ? '' : 'part'}" style="width:${p.pct}%"></div></div>
+        ${p.all ? `<div><span class="badge-done">${CHECK_SVG.replace('<svg', '<svg style="width:16px;height:16px;stroke:#04250f;stroke-width:3.4;fill:none"')} 完了</span></div>` : ''}
+        ${t ? `<div class="times">${hhmm(t.first)} → ${hhmm(t.last)}（${t.min}分・${t.n}件）</div>` : ''}
+      </button>`;
+  }).join('') + `</div>`;
+
+  bar.innerHTML = `<button class="btn" data-act="settings">⚙ 設定</button>`;
+  // ボタンを画面いっぱいに広げるため、ヘッダーの実寸をCSSへ渡す
+  requestAnimationFrame(() => {
+    document.documentElement.style.setProperty('--hdr-h', hdr.offsetHeight + 'px');
+  });
+}
+
+/* ---------------- 2. チェックリスト ---------------- */
+function sceneHeaderHTML(scene) {
+  const p = progress(scene), t = sceneTimes(scene);
+  return `
+    <div class="h-row">
+      <h1 class="h-title">${esc(scene.name)}</h1>
+      <span class="h-count ${p.all ? 'done' : ''}">${p.done}/${p.total}</span>
+    </div>
+    <div class="track"><div class="fill ${p.all ? '' : 'part'}" style="width:${p.pct}%"></div></div>
+    <div class="h-sub" style="margin-top:8px">
+      ${esc(dateLabel(today))}${t ? ` ／ ${hhmm(t.first)} → ${hhmm(t.last)}（${t.min}分）` : ' ／ まだチェックがありません'}
+    </div>`;
+}
+
+function renderScene(scene) {
+  hdr.innerHTML = sceneHeaderHTML(scene);
+
+  main.innerHTML = scene.items.length
+    ? `<div class="stack">` + scene.items.map(it => {
+        const on = isChecked(scene.id, it.id), at = checkedAt(scene.id, it.id);
+        return `
+          <button class="item ${on ? 'on' : ''}" role="checkbox" aria-checked="${on}"
+                  data-item="${esc(it.id)}" data-scene="${esc(scene.id)}">
+            <span class="box">${CHECK_SVG}</span>
+            <span class="txt">${esc(it.text)}</span>
+            <span class="at">${at ? hhmm(at) : ''}</span>
+          </button>`;
+      }).join('') + `</div>`
+    : `<p class="empty">項目がありません。<br>下の「設定」から追加してください。</p>`;
+
+  bar.innerHTML = `
+    <button class="btn grow2" data-act="home">← 場面選択</button>
+    <button class="btn danger" data-act="reset" data-scene="${esc(scene.id)}">リセット</button>`;
+}
+
+/* チェック時は画面を作り直さず、その行とヘッダーだけ更新（速く・スクロール位置も保つ） */
+function refreshRow(btn, scene, itemId) {
+  const on = isChecked(scene.id, itemId), at = checkedAt(scene.id, itemId);
+  btn.classList.toggle('on', on);
+  btn.setAttribute('aria-checked', String(on));
+  const t = btn.querySelector('.at');
+  if (t) t.textContent = at ? hhmm(at) : '';
+  hdr.innerHTML = sceneHeaderHTML(scene);
+}
+
+/* ---------------- 3. 設定 ---------------- */
+function renderSettings() {
+  hdr.innerHTML = `<div class="h-row"><h1 class="h-title">設定</h1></div>`;
+
+  const days = Object.keys(state.log).length;
+  const items = state.scenes.reduce((n, s) => n + s.items.length, 0);
+
+  main.innerHTML =
+    state.scenes.map((s, si) => `
+      <section class="sec">
+        <h2>場面 ${si + 1}</h2>
+        <p class="hint" style="margin:0 0 8px">場面選択画面に出す名前</p>
+        <input class="name-input" type="text" value="${esc(s.name)}" data-edit="scene" data-scene="${esc(s.id)}"
+               aria-label="場面の名前" maxlength="30">
+        <p class="hint" style="margin:12px 0 0">項目（${s.items.length}件）／ ▲▼で並べ替え</p>
+        ${s.items.map((it, i) => `
+          <div class="edit-card">
+            <input type="text" value="${esc(it.text)}" data-edit="item" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
+                   aria-label="項目の内容" maxlength="80">
+            <div class="edit-tools">
+              <button class="iconbtn" data-act="up" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
+                      aria-label="上へ移動" ${i === 0 ? 'disabled' : ''}>▲</button>
+              <button class="iconbtn" data-act="down" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
+                      aria-label="下へ移動" ${i === s.items.length - 1 ? 'disabled' : ''}>▼</button>
+              <button class="iconbtn del" data-act="del" data-scene="${esc(s.id)}" data-item="${esc(it.id)}"
+                      aria-label="この項目を削除">✕</button>
+            </div>
+          </div>`).join('')}
+        <div class="row-actions">
+          <button class="btn sm primary" data-act="add" data-scene="${esc(s.id)}">＋ 項目を追加</button>
+        </div>
+      </section>`).join('') + `
+
+    <section class="sec">
+      <h2>バックアップ</h2>
+      <p class="hint">機種変更やブラウザのデータ削除に備えて、ときどき書き出して保存しておいてください。
+読み込むと現在のデータは置き換わります。</p>
+      <div class="row-actions">
+        <button class="btn sm primary" data-act="export">⬇ JSONに書き出す</button>
+        <button class="btn sm" data-act="import">⬆ JSONを読み込む</button>
+      </div>
+      <div class="kv" style="margin-top:12px"><span>チェック項目</span><b>${items}件</b></div>
+      <div class="kv"><span>記録が残っている日数</span><b>${days}日分</b></div>
+    </section>
+
+    <section class="sec">
+      <h2>画面スリープ</h2>
+      <p class="hint">オンにすると、このアプリを開いている間は画面が消えません（Wake Lock）。
+端末の電池セーバー中は効かないことがあります。</p>
+      <div class="row-actions">
+        <button class="btn sm ${state.settings.keepAwake ? 'primary' : ''}" data-act="keepawake">
+          ${state.settings.keepAwake ? '✓ スリープしない（オン）' : 'スリープしない（オフ）'}
+        </button>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>このアプリについて</h2>
+      <div class="kv"><span>データの保存先</span><b>この端末の中だけ</b></div>
+      <div class="kv"><span>日付の区切り</span><b>午前${DAY_START_HOUR}時</b></div>
+      <div class="kv"><span>履歴の保持</span><b>直近${KEEP_DAYS}日</b></div>
+      <div class="row-actions" style="margin-top:14px">
+        <button class="btn sm danger" data-act="wipe">全データを消去</button>
+      </div>
+    </section>`;
+
+  bar.innerHTML = `<button class="btn" data-act="home">← 場面選択</button>`;
+}
+
+/* =========================================================
+   操作
+   ========================================================= */
+document.addEventListener('click', async (e) => {
+  const goBtn = e.target.closest('[data-go]');
+  if (goBtn) { go('#/scene/' + encodeURIComponent(goBtn.dataset.go)); return; }
+
+  const item = e.target.closest('.item');
+  if (item) {
+    const scene = findScene(item.dataset.scene);
+    if (!scene) return;
+    if (checkDayRollover()) return;           // 日付が変わっていたら作り直す
+    toggleItem(scene.id, item.dataset.item);
+    refreshRow(item, scene, item.dataset.item);
+    if (navigator.vibrate) navigator.vibrate(12);
+    return;
+  }
+
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const scene = btn.dataset.scene ? findScene(btn.dataset.scene) : null;
+
+  switch (act) {
+    case 'home':     go('#/'); break;
+    case 'settings': go('#/settings'); break;
+
+    case 'reset': {
+      if (!scene) break;
+      const p = progress(scene);
+      if (p.done === 0) { toast('チェックはまだありません'); break; }
+      const ok = await confirmDialog({
+        title: `「${scene.name}」をリセット`,
+        body: `本日のチェック ${p.done}件 と、その時刻の記録を消します。\nこの操作は取り消せません。`,
+        ok: 'リセットする', danger: true,
+      });
+      if (!ok) break;
+      delete dayLog()[scene.id];
+      save(true);
+      renderScene(scene);
+      toast(`「${scene.name}」をリセットしました`);
+      break;
+    }
+
+    case 'add': {
+      if (!scene) break;
+      scene.items.push({ id: uid(), text: '' });
+      save(true);
+      renderSettings();
+      const inputs = main.querySelectorAll(`[data-edit="item"][data-scene="${CSS.escape(scene.id)}"]`);
+      const last = inputs[inputs.length - 1];
+      if (last) { last.focus(); last.scrollIntoView({ block: 'center' }); }
+      break;
+    }
+
+    case 'up':
+    case 'down': {
+      if (!scene) break;
+      const i = scene.items.findIndex(it => it.id === btn.dataset.item);
+      const j = act === 'up' ? i - 1 : i + 1;
+      if (i < 0 || j < 0 || j >= scene.items.length) break;
+      const y = window.scrollY;
+      [scene.items[i], scene.items[j]] = [scene.items[j], scene.items[i]];
+      save(true);
+      renderSettings();
+      window.scrollTo(0, y);
+      break;
+    }
+
+    case 'del': {
+      if (!scene) break;
+      const it = scene.items.find(x => x.id === btn.dataset.item);
+      if (!it) break;
+      const ok = await confirmDialog({
+        title: '項目を削除', body: it.text ? `「${it.text}」を削除します。` : 'この空の項目を削除します。',
+        ok: '削除する', danger: true,
+      });
+      if (!ok) break;
+      const y = window.scrollY;
+      scene.items = scene.items.filter(x => x.id !== it.id);
+      // 過去のチェック記録からも取り除く
+      for (const day of Object.values(state.log)) if (day[scene.id]) delete day[scene.id][it.id];
+      save(true);
+      renderSettings();
+      window.scrollTo(0, y);
+      break;
+    }
+
+    case 'keepawake': {
+      state.settings.keepAwake = !state.settings.keepAwake;
+      save(true);
+      if (state.settings.keepAwake) {
+        await acquireWakeLock();
+        toast('wakeLock' in navigator ? '画面はスリープしません' : 'この端末は非対応です');
+      } else {
+        await releaseWakeLock();
+        toast('通常どおりスリープします');
+      }
+      const y = window.scrollY; renderSettings(); window.scrollTo(0, y);
+      break;
+    }
+
+    case 'export': exportJSON(); break;
+    case 'import': importJSON(); break;
+
+    case 'wipe': {
+      const ok1 = await confirmDialog({
+        title: '全データを消去', body: 'チェック項目も履歴もすべて消え、初期状態に戻ります。\n先にJSONへ書き出しておくことを強くおすすめします。',
+        ok: '次へ', danger: true,
+      });
+      if (!ok1) break;
+      const ok2 = await confirmDialog({ title: '本当に消しますか？', body: '取り消せません。', ok: '消去する', danger: true });
+      if (!ok2) break;
+      state = defaultData();
+      save(true);
+      go('#/'); render();
+      toast('初期状態に戻しました');
+      break;
+    }
+  }
+});
+
+/* テキスト編集（再描画せずに保存＝入力中にカーソルが飛ばない） */
+main.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-edit]');
+  if (!el) return;
+  const scene = findScene(el.dataset.scene);
+  if (!scene) return;
+  if (el.dataset.edit === 'scene') scene.name = el.value;
+  else {
+    const it = scene.items.find(x => x.id === el.dataset.item);
+    if (it) it.text = el.value;
+  }
+  save();
+});
+
+/* =========================================================
+   バックアップ（書き出し / 読み込み）
+   ========================================================= */
+function exportJSON() {
+  save(true);
+  const now = new Date();
+  const name = `checklist-backup-${now.getFullYear()}${pad2(now.getMonth()+1)}${pad2(now.getDate())}-${pad2(now.getHours())}${pad2(now.getMinutes())}.json`;
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast('書き出しました：' + name, 4000);
+}
+
+function importJSON() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json,.json';
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    let obj;
+    try { obj = JSON.parse(await file.text()); }
+    catch (e) { toast('JSONとして読めませんでした'); return; }
+    if (!isValidData(obj)) { toast('このアプリのバックアップではないようです'); return; }
+    const n = normalize(obj);
+    const items = n.scenes.reduce((a, s) => a + s.items.length, 0);
+    const ok = await confirmDialog({
+      title: '読み込みますか？',
+      body: `場面 ${n.scenes.length}件／項目 ${items}件／記録 ${Object.keys(n.log).length}日分\n\n今この端末にあるデータは置き換わります。`,
+      ok: '読み込む', danger: true,
+    });
+    if (!ok) return;
+    state = n;
+    today = businessDateKey();
+    pruneLog();
+    save(true);
+    go('#/'); render();
+    toast('読み込みました');
+  };
+  inp.click();
+}
+
+/* =========================================================
+   日付の切り替わり
+   ========================================================= */
+function checkDayRollover() {
+  const k = businessDateKey();
+  if (k === today) return false;
+  today = k;
+  pruneLog();
+  save(true);
+  render();
+  toast('日付が変わりました。新しい1日として始めます', 4000);
+  return true;
+}
+setInterval(checkDayRollover, 30000);
+
+/* =========================================================
+   Service Worker（オフライン動作）
+   ========================================================= */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            const el = $('#toast');
+            el.innerHTML = '新しいバージョンがあります<button type="button" id="doUpdate">更新</button>';
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            $('#doUpdate').onclick = () => {
+              navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+              nw.postMessage('skip-waiting');
+            };
+          }
+        });
+      });
+    } catch (e) { /* オフライン等。無視 */ }
+  });
+}
+
+/* =========================================================
+   起動
+   ========================================================= */
+state = load();
+today = businessDateKey();
+pruneLog();
+save(true);
+render();
+acquireWakeLock();
+})();
+</script>
+</body>
+</html>
