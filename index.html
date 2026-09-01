@@ -3,25 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>納品チェックリスト</title>
-<meta name="description" content="納品業務の場面別チェックリスト（端末内保存・オフライン動作）">
-<meta name="theme-color" content="#0d1117">
-<meta name="color-scheme" content="dark">
+<title>チェックリスト</title>
+<meta name="description" content="業務用チェックリスト（端末内保存・オフライン動作）">
+<meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icons/icon-192.png">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="チェック">
+<meta name="apple-mobile-web-app-title" content="チェックリスト">
 <style>
+/* ---------- 配色（既定＝ダーク。端末がライトならライトへ切り替わる） ---------- */
 :root{
-  --bg:#0d1117; --card:#161d26; --card2:#202b36; --line:#333f4c;
-  --fg:#f2f6fa; --muted:#93a6b8;
-  --ok:#22d37a; --ok-bg:#0e3222; --ok-line:#1f9d5e;
+  --bg:#0d1117; --card:#161d26; --card2:#202b36; --line:#333f4c; --press:#2b3846;
+  --fg:#f2f6fa; --muted:#93a6b8; --field:#080b0f;
+  --ok:#22d37a; --ok-bg:#0e3222; --ok-line:#1f9d5e; --on-ok:#04250f;
   --skip:#e6a640; --skip-bg:#2a2116; --skip-line:#8a6524;
-  --accent:#4da3ff; --danger:#ff5252;
+  --accent:#4da3ff; --primary-bg:#123f6d; --primary-fg:#dbeaff;
+  --danger:#ff8f8f; --danger-bg:#3d1717; --danger-line:#7d3030;
+  --bar-bg:rgba(13,17,23,.97);
+  --toast-bg:#eef4fb; --toast-fg:#0d1117; --toast-link:#0b4ea2;
+  --shadow:0 8px 24px rgba(0,0,0,.5);
   --bar-h:60px; --radius:12px;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --card2:#e9eef4; --line:#ccd6e0; --press:#dbe3ec;
+    --fg:#101820; --muted:#5b6b7b; --field:#ffffff;
+    --ok:#0f9d58; --ok-bg:#e4f5ea; --ok-line:#0f9d58; --on-ok:#ffffff;
+    --skip:#a96a00; --skip-bg:#fdf2e0; --skip-line:#d6a24a;
+    --accent:#0b62c4; --primary-bg:#e2edfc; --primary-fg:#0b3f80;
+    --danger:#a12222; --danger-bg:#fdecec; --danger-line:#e0a3a3;
+    --bar-bg:rgba(244,246,249,.97);
+    --toast-bg:#1b2430; --toast-fg:#f2f6fa; --toast-link:#8bc0ff;
+    --shadow:0 8px 24px rgba(16,24,32,.18);
+  }
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
@@ -38,40 +57,38 @@ button{cursor:pointer}
 
 /* ---------- ヘッダー ---------- */
 #hdr{
-  position:sticky; top:0; z-index:20;
-  background:linear-gradient(180deg,#0d1117 82%,rgba(13,17,23,0));
+  position:sticky; top:0; z-index:20; background:var(--bg);
   padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
 }
 .h-row{display:flex; align-items:baseline; gap:8px}
-.h-title{font-size:18px; font-weight:700; letter-spacing:.01em; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.h-title{font-size:18px; font-weight:700; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .h-sub{font-size:12px; color:var(--muted); margin-top:5px}
 .h-count{margin-left:auto; font-size:17px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
 .h-count.done{color:var(--ok)}
 
 /* ---------- プログレスバー ---------- */
-.track{height:6px; border-radius:99px; background:#080b0f; border:1px solid var(--line); overflow:hidden; margin-top:8px; display:flex}
+.track{height:6px; border-radius:99px; background:var(--card2); border:1px solid var(--line); overflow:hidden; margin-top:8px; display:flex}
 .fill{height:100%; background:var(--ok); width:0%; transition:width .16s ease}
 .fill.skip{background:var(--skip)}
 
 /* ---------- 本体 ---------- */
 main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
 .stack{display:flex; flex-direction:column; gap:8px}
-/* 場面選択は下寄せ（親指の届く範囲に集める） */
 .stack.grow{min-height:calc(100dvh - var(--hdr-h,84px) - var(--bar-h) - env(safe-area-inset-bottom) - 20px); justify-content:center}
 
-/* 場面選択のボタン */
-.scene-btn{
+/* ---------- コンテキスト選択のボタン ---------- */
+.ctx-btn{
   display:block; width:100%; text-align:left;
   background:var(--card); border:1px solid var(--line); border-radius:14px;
   padding:14px 14px 12px; color:var(--fg);
 }
-.scene-btn:active{background:var(--card2)}
-.scene-btn.done{border-color:var(--ok-line); background:var(--ok-bg)}
-.scene-btn .top{display:flex; align-items:center; gap:10px}
-.scene-btn .name{font-size:19px; font-weight:700}
-.scene-btn .frac{margin-left:auto; font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
-.scene-btn.done .frac{color:var(--ok)}
-.scene-btn .times{margin-top:7px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums}
+.ctx-btn:active{background:var(--card2)}
+.ctx-btn.done{border-color:var(--ok-line); background:var(--ok-bg)}
+.ctx-btn .top{display:flex; align-items:center; gap:10px}
+.ctx-btn .name{font-size:19px; font-weight:700}
+.ctx-btn .frac{margin-left:auto; font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
+.ctx-btn.done .frac{color:var(--ok)}
+.ctx-btn .times{margin-top:7px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums}
 
 /* ---------- チェック項目 ---------- */
 .item{
@@ -94,7 +111,7 @@ main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
   content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
   width:13px; height:3px; background:var(--skip); border-radius:2px;
 }
-.box svg{width:18px; height:18px; stroke:#04250f; stroke-width:3.6; fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:0}
+.box svg{width:18px; height:18px; stroke:var(--on-ok); stroke-width:3.6; fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:0}
 .item.on .box svg{opacity:1}
 .item .txt{flex:1; min-width:0; font-size:16px; font-weight:600; line-height:1.3; word-break:break-word}
 .item.on .txt{opacity:.8}
@@ -108,14 +125,14 @@ main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
 .skipbtn:active{background:var(--card2)}
 .item.skipped .skipbtn{border-color:var(--skip-line); color:var(--skip)}
 
-.empty{color:var(--muted); text-align:center; padding:32px 10px; font-size:14px}
+.empty{color:var(--muted); text-align:center; padding:32px 10px; font-size:14px; line-height:1.7}
 .mode-note{font-size:12px; color:var(--muted); padding:2px 2px 6px}
 
 /* ---------- 下部の操作バー ---------- */
 #bar{
   position:fixed; left:0; right:0; bottom:0; z-index:30;
   display:flex; gap:8px; padding:7px 10px calc(7px + env(safe-area-inset-bottom));
-  background:rgba(13,17,23,.97); border-top:1px solid var(--line);
+  background:var(--bar-bg); border-top:1px solid var(--line);
   backdrop-filter:blur(6px);
 }
 #bar .btn{flex:1}
@@ -125,27 +142,27 @@ main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
   font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;
   white-space:nowrap;
 }
-.btn:active{background:#2b3846}
-.btn.primary{background:#123f6d; border-color:var(--accent)}
-.btn.danger{background:#3d1717; border-color:#7d3030; color:#ffcaca}
+.btn:active{background:var(--press)}
+.btn.primary{background:var(--primary-bg); border-color:var(--accent); color:var(--primary-fg)}
+.btn.danger{background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger)}
 .btn.grow2{flex:1.6}
 .btn.sm{min-height:38px; font-size:13px; padding:7px 11px; border-radius:10px; flex:0 0 auto}
 .btn[disabled]{opacity:.4}
 
 /* ---------- 項目エディタ（リスト画面の編集モード / 設定画面 共通） ---------- */
-.edit-card{background:#111823; border:1px solid var(--line); border-radius:11px; padding:7px; margin-top:7px}
+.edit-card{background:var(--card2); border:1px solid var(--line); border-radius:11px; padding:7px; margin-top:7px}
 .edit-card input[type=text]{
   width:100%; padding:9px 10px; font-size:15px;
-  background:#080b0f; color:var(--fg); border:1px solid var(--line); border-radius:9px;
+  background:var(--field); color:var(--fg); border:1px solid var(--line); border-radius:9px;
 }
 .edit-tools{display:flex; gap:6px; justify-content:flex-end; margin-top:6px}
 .iconbtn{
   flex:0 0 auto; width:38px; height:38px; border-radius:9px;
-  background:var(--card2); border:1px solid var(--line); color:var(--fg);
+  background:var(--card); border:1px solid var(--line); color:var(--fg);
   font-size:15px; font-weight:800; display:grid; place-items:center;
 }
-.iconbtn:active{background:#2b3846}
-.iconbtn.del{color:#ff9d9d; border-color:#6b2a2a}
+.iconbtn:active{background:var(--press)}
+.iconbtn.del{color:var(--danger); border-color:var(--danger-line)}
 .iconbtn[disabled]{opacity:.28}
 .row-actions{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap}
 
@@ -155,15 +172,15 @@ main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
 .sec .hint{margin:0 0 10px; font-size:12px; color:var(--muted); line-height:1.5}
 .name-input{
   width:100%; padding:10px 12px; font-size:16px; font-weight:700;
-  background:#080b0f; color:var(--fg); border:1px solid var(--line); border-radius:10px;
+  background:var(--field); color:var(--fg); border:1px solid var(--line); border-radius:10px;
 }
 .kv{display:flex; justify-content:space-between; gap:12px; font-size:13px; color:var(--muted); padding:5px 0}
 .kv b{color:var(--fg); font-weight:700}
 
 /* ---------- モーダル / トースト ---------- */
-#modal{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:16px; background:rgba(0,0,0,.74)}
+#modal{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:16px; background:rgba(0,0,0,.6)}
 #modal[hidden]{display:none}
-.sheet{width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px}
+.sheet{width:100%; max-width:400px; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:var(--shadow)}
 .sheet h3{margin:0 0 6px; font-size:17px; font-weight:700}
 .sheet p{margin:0 0 14px; font-size:14px; color:var(--muted); line-height:1.55; white-space:pre-wrap}
 .sheet .acts{display:flex; gap:8px}
@@ -171,12 +188,12 @@ main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
 #toast{
   position:fixed; left:50%; transform:translateX(-50%);
   bottom:calc(var(--bar-h) + 14px + env(safe-area-inset-bottom)); z-index:70;
-  background:#eef4fb; color:#0d1117; font-weight:700; font-size:14px;
-  padding:10px 15px; border-radius:99px; box-shadow:0 8px 24px rgba(0,0,0,.5);
+  background:var(--toast-bg); color:var(--toast-fg); font-weight:700; font-size:14px;
+  padding:10px 15px; border-radius:99px; box-shadow:var(--shadow);
   max-width:88vw; text-align:center; display:none;
 }
 #toast.show{display:block}
-#toast button{background:none;border:0;color:#0b4ea2;font-weight:800;text-decoration:underline;padding:0 0 0 10px}
+#toast button{background:none;border:0;color:var(--toast-link);font-weight:800;text-decoration:underline;padding:0 0 0 10px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -205,9 +222,9 @@ const KEEP_DAYS      = 60;  // チェック履歴の保持日数
 function defaultData() {
   const mk = (name, items) => ({ id: uid(), name, items: items.map(t => ({ id: uid(), text: t })) });
   return {
-    version: 2,
+    version: 3,
     settings: { keepAwake: true },
-    scenes: [
+    contexts: [
       mk('出発前', [
         '納品書・伝票を持ったか',
         '商品の数量を照合した',
@@ -234,7 +251,7 @@ function defaultData() {
         '明日の指示を確認した',
       ]),
     ],
-    // log[業務日][場面ID][項目ID] = { at: 時刻(epoch ms), skip: true(スキップの場合) }
+    // log[業務日][コンテキストID][項目ID] = { at: 時刻(epoch ms), skip: true(スキップの場合) }
     log: {},
   };
 }
@@ -277,18 +294,23 @@ function daysBetween(aKey, bKey) {
 let state = null;
 let today = businessDateKey();
 
+/* version 1・2 では "contexts" ではなく "scenes" という名前だった */
+function contextsOf(o) {
+  return Array.isArray(o.contexts) ? o.contexts : (Array.isArray(o.scenes) ? o.scenes : null);
+}
 function isValidData(o) {
-  return !!o && typeof o === 'object'
-    && Array.isArray(o.scenes)
-    && o.scenes.every(s => s && typeof s.name === 'string' && Array.isArray(s.items))
-    && o.log && typeof o.log === 'object' && !Array.isArray(o.log);
+  if (!o || typeof o !== 'object') return false;
+  const cs = contextsOf(o);
+  return !!cs
+    && cs.every(c => c && typeof c.name === 'string' && Array.isArray(c.items))
+    && !!o.log && typeof o.log === 'object' && !Array.isArray(o.log);
 }
 
 function normalize(o) {
   const d = {
-    version: 2,
+    version: 3,
     settings: Object.assign({ keepAwake: true }, o.settings || {}),
-    scenes: o.scenes.map(s => ({
+    contexts: contextsOf(o).map(s => ({
       id: s.id || uid(),
       name: String(s.name),
       items: (s.items || [])
@@ -297,10 +319,10 @@ function normalize(o) {
     })),
     log: {},
   };
-  for (const [day, scenes] of Object.entries(o.log || {})) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !scenes || typeof scenes !== 'object') continue;
+  for (const [day, contexts] of Object.entries(o.log || {})) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !contexts || typeof contexts !== 'object') continue;
     const dd = {};
-    for (const [sid, items] of Object.entries(scenes)) {
+    for (const [sid, items] of Object.entries(contexts)) {
       if (!items || typeof items !== 'object') continue;
       const ii = {};
       for (const [iid, v] of Object.entries(items)) {
@@ -365,43 +387,43 @@ function dayLog(day = today) {
   if (!state.log[day]) state.log[day] = {};
   return state.log[day];
 }
-function sceneLog(sceneId, day = today) {
+function ctxLog(ctxId, day = today) {
   const dl = dayLog(day);
-  if (!dl[sceneId]) dl[sceneId] = {};
-  return dl[sceneId];
+  if (!dl[ctxId]) dl[ctxId] = {};
+  return dl[ctxId];
 }
 /* 1項目の状態は次の3つ。entry が無ければ「未」。
    { at }             … チェック済み
    { at, skip:true }  … スキップ                                        */
-function entryOf(sceneId, itemId) {
+function entryOf(ctxId, itemId) {
   const d = state.log[today];
-  return (d && d[sceneId] && d[sceneId][itemId]) || null;
+  return (d && d[ctxId] && d[ctxId][itemId]) || null;
 }
-function isChecked(sceneId, itemId) { const e = entryOf(sceneId, itemId); return !!e && !e.skip; }
-function isSkipped(sceneId, itemId) { const e = entryOf(sceneId, itemId); return !!e && !!e.skip; }
-function checkedAt(sceneId, itemId) { const e = entryOf(sceneId, itemId); return e ? e.at : 0; }
+function isChecked(ctxId, itemId) { const e = entryOf(ctxId, itemId); return !!e && !e.skip; }
+function isSkipped(ctxId, itemId) { const e = entryOf(ctxId, itemId); return !!e && !!e.skip; }
+function checkedAt(ctxId, itemId) { const e = entryOf(ctxId, itemId); return e ? e.at : 0; }
 
-function toggleItem(sceneId, itemId) {
-  const sl = sceneLog(sceneId);
+function toggleItem(ctxId, itemId) {
+  const sl = ctxLog(ctxId);
   const e = sl[itemId];
   if (e && !e.skip) delete sl[itemId];       // チェック済み → 未
   else sl[itemId] = { at: Date.now() };      // 未・スキップ → チェック済み
   save();
 }
-function toggleSkip(sceneId, itemId) {
-  const sl = sceneLog(sceneId);
+function toggleSkip(ctxId, itemId) {
+  const sl = ctxLog(ctxId);
   const e = sl[itemId];
   if (e && e.skip) delete sl[itemId];                  // スキップ → 未
   else sl[itemId] = { at: Date.now(), skip: true };    // 未・チェック済み → スキップ
   save();
 }
 
-function progress(scene) {
-  const total = scene.items.length;
+function progress(ctx) {
+  const total = ctx.items.length;
   let done = 0, skipped = 0;
-  for (const it of scene.items) {
-    if (isChecked(scene.id, it.id)) done++;
-    else if (isSkipped(scene.id, it.id)) skipped++;
+  for (const it of ctx.items) {
+    if (isChecked(ctx.id, it.id)) done++;
+    else if (isSkipped(ctx.id, it.id)) skipped++;
   }
   const handled = done + skipped;   // 「もう触らなくていい」件数
   return {
@@ -411,14 +433,14 @@ function progress(scene) {
     all: total > 0 && handled === total,
   };
 }
-function sceneTimes(scene) {
-  const ts = scene.items.map(it => checkedAt(scene.id, it.id)).filter(Boolean).sort((a, b) => a - b);
+function ctxTimes(ctx) {
+  const ts = ctx.items.map(it => checkedAt(ctx.id, it.id)).filter(Boolean).sort((a, b) => a - b);
   if (!ts.length) return null;
   const first = ts[0], last = ts[ts.length - 1];
   const min = Math.round((last - first) / 60000);
   return { first, last, min, n: ts.length };
 }
-function findScene(id) { return state.scenes.find(s => s.id === id) || null; }
+function findCtx(id) { return state.contexts.find(s => s.id === id) || null; }
 
 /* =========================================================
    トースト / 確認ダイアログ
@@ -484,7 +506,7 @@ document.addEventListener('visibilitychange', () => {
    ========================================================= */
 function route() {
   const h = location.hash || '#/';
-  if (h.startsWith('#/scene/')) return { view: 'scene', id: decodeURIComponent(h.slice('#/scene/'.length)) };
+  if (h.startsWith('#/ctx/')) return { view: 'ctx', id: decodeURIComponent(h.slice('#/ctx/'.length)) };
   if (h === '#/settings') return { view: 'settings' };
   return { view: 'home' };
 }
@@ -497,9 +519,9 @@ let editMode = false;   // チェックリスト画面の「編集」モード
 
 function render(resetScroll = true) {
   const r = route();
-  if (r.view === 'scene' && !findScene(r.id)) { go('#/'); return; }
-  if (r.view !== 'scene') editMode = false;
-  if (r.view === 'scene') renderScene(findScene(r.id));
+  if (r.view === 'ctx' && !findCtx(r.id)) { go('#/'); return; }
+  if (r.view !== 'ctx') editMode = false;
+  if (r.view === 'ctx') renderCtx(findCtx(r.id));
   else if (r.view === 'settings') renderSettings();
   else renderHome();
   if (resetScroll) document.documentElement.scrollTop = 0;
@@ -519,21 +541,27 @@ function trackHTML(p) {
   </div>`;
 }
 
-/* ---------------- 1. 場面選択 ---------------- */
+/* ---------------- 1. コンテキスト選択 ---------------- */
 function renderHome() {
   hdr.innerHTML = `
-    <div class="h-row"><h1 class="h-title">納品チェックリスト</h1></div>
-    <div class="h-sub">${esc(dateLabel(today))} ／ 午前${DAY_START_HOUR}時で日付が切り替わります</div>`;
+    <div class="h-row"><h1 class="h-title">チェックリスト</h1></div>
+    <div class="h-sub">${esc(dateLabel(today))}</div>`;
 
-  main.innerHTML = `<div class="stack grow">` + state.scenes.map(s => {
-    const p = progress(s), t = sceneTimes(s);
+  if (!state.contexts.length) {
+    main.innerHTML = `<p class="empty">コンテキストがありません。<br>下の「設定」から追加してください。</p>`;
+    bar.innerHTML = `<button class="btn primary" data-act="settings">⚙ 設定</button>`;
+    return;
+  }
+
+  main.innerHTML = `<div class="stack grow">` + state.contexts.map(s => {
+    const p = progress(s), t = ctxTimes(s);
     const note = [
       p.all ? '完了' : '',
       p.skipped ? `スキップ${p.skipped}` : '',
       t ? `${hhmm(t.first)} → ${hhmm(t.last)}（${t.min}分）` : '',
     ].filter(Boolean).join(' ／ ');
     return `
-      <button class="scene-btn ${p.all ? 'done' : ''}" data-go="${esc(s.id)}">
+      <button class="ctx-btn ${p.all ? 'done' : ''}" data-go="${esc(s.id)}">
         <div class="top">
           <span class="name">${esc(s.name)}</span>
           <span class="frac">${p.handled}/${p.total}</span>
@@ -551,8 +579,8 @@ function renderHome() {
 }
 
 /* ---------------- 2. チェックリスト ---------------- */
-function sceneHeaderHTML(scene) {
-  const p = progress(scene), t = sceneTimes(scene);
+function ctxHeaderHTML(ctx) {
+  const p = progress(ctx), t = ctxTimes(ctx);
   const sub = [
     dateLabel(today),
     p.skipped ? `スキップ${p.skipped}` : '',
@@ -560,7 +588,7 @@ function sceneHeaderHTML(scene) {
   ].filter(Boolean).join(' ／ ');
   return `
     <div class="h-row">
-      <h1 class="h-title">${esc(scene.name)}</h1>
+      <h1 class="h-title">${esc(ctx.name)}</h1>
       <span class="h-count ${p.all ? 'done' : ''}">${p.handled}/${p.total}</span>
     </div>
     ${trackHTML(p)}
@@ -568,62 +596,62 @@ function sceneHeaderHTML(scene) {
 }
 
 /* 項目エディタ（チェックリスト画面の編集モードと設定画面で共用） */
-function itemEditorHTML(scene) {
-  return scene.items.map((it, i) => `
+function itemEditorHTML(ctx) {
+  return ctx.items.map((it, i) => `
     <div class="edit-card">
-      <input type="text" value="${esc(it.text)}" data-edit="item" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+      <input type="text" value="${esc(it.text)}" data-edit="item" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
              aria-label="項目の内容" maxlength="80" placeholder="項目を入力">
       <div class="edit-tools">
-        <button class="iconbtn" data-act="up" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+        <button class="iconbtn" data-act="up" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
                 aria-label="上へ移動" ${i === 0 ? 'disabled' : ''}>▲</button>
-        <button class="iconbtn" data-act="down" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
-                aria-label="下へ移動" ${i === scene.items.length - 1 ? 'disabled' : ''}>▼</button>
-        <button class="iconbtn del" data-act="del" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+        <button class="iconbtn" data-act="down" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
+                aria-label="下へ移動" ${i === ctx.items.length - 1 ? 'disabled' : ''}>▼</button>
+        <button class="iconbtn del" data-act="del" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
                 aria-label="この項目を削除">✕</button>
       </div>
     </div>`).join('') + `
     <div class="row-actions">
-      <button class="btn sm primary" data-act="add" data-scene="${esc(scene.id)}">＋ 項目を追加</button>
+      <button class="btn sm primary" data-act="add" data-ctx="${esc(ctx.id)}">＋ 項目を追加</button>
     </div>`;
 }
 
-function itemRowHTML(scene, it) {
-  const on = isChecked(scene.id, it.id), sk = isSkipped(scene.id, it.id);
-  const at = checkedAt(scene.id, it.id);
+function itemRowHTML(ctx, it) {
+  const on = isChecked(ctx.id, it.id), sk = isSkipped(ctx.id, it.id);
+  const at = checkedAt(ctx.id, it.id);
   return `
     <div class="item ${on ? 'on' : ''} ${sk ? 'skipped' : ''}" role="checkbox" aria-checked="${on}" tabindex="0"
-         data-item="${esc(it.id)}" data-scene="${esc(scene.id)}">
+         data-item="${esc(it.id)}" data-ctx="${esc(ctx.id)}">
       <span class="box">${CHECK_SVG}</span>
       <span class="txt">${esc(it.text)}</span>
       <span class="at">${at ? hhmm(at) : ''}</span>
-      <button class="skipbtn" data-act="skip" data-scene="${esc(scene.id)}" data-item="${esc(it.id)}"
+      <button class="skipbtn" data-act="skip" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
               aria-label="${sk ? 'スキップを取り消す' : 'この項目をスキップ'}">${sk ? '戻す' : 'スキップ'}</button>
     </div>`;
 }
 
-function renderScene(scene) {
-  hdr.innerHTML = sceneHeaderHTML(scene);
+function renderCtx(ctx) {
+  hdr.innerHTML = ctxHeaderHTML(ctx);
 
   if (editMode) {
-    main.innerHTML = `<p class="mode-note">項目を編集中です。▲▼で並べ替え、✕で削除。</p>` + itemEditorHTML(scene);
+    main.innerHTML = `<p class="mode-note">項目を編集中です。▲▼で並べ替え、✕で削除。</p>` + itemEditorHTML(ctx);
     bar.innerHTML = `<button class="btn primary" data-act="editdone">✓ 編集を終わる</button>`;
     return;
   }
 
-  main.innerHTML = scene.items.length
-    ? `<div class="stack">` + scene.items.map(it => itemRowHTML(scene, it)).join('') + `</div>`
+  main.innerHTML = ctx.items.length
+    ? `<div class="stack">` + ctx.items.map(it => itemRowHTML(ctx, it)).join('') + `</div>`
     : `<p class="empty">項目がありません。<br>下の「編集」から追加してください。</p>`;
 
   bar.innerHTML = `
-    <button class="btn grow2" data-act="home">← 場面</button>
+    <button class="btn grow2" data-act="home">← 一覧</button>
     <button class="btn" data-act="edit">✎ 編集</button>
-    <button class="btn danger" data-act="reset" data-scene="${esc(scene.id)}">リセット</button>`;
+    <button class="btn danger" data-act="reset" data-ctx="${esc(ctx.id)}">リセット</button>`;
 }
 
 /* チェック時は画面を作り直さず、その行とヘッダーだけ更新（速く・スクロール位置も保つ） */
-function refreshRow(row, scene, itemId) {
-  const on = isChecked(scene.id, itemId), sk = isSkipped(scene.id, itemId);
-  const at = checkedAt(scene.id, itemId);
+function refreshRow(row, ctx, itemId) {
+  const on = isChecked(ctx.id, itemId), sk = isSkipped(ctx.id, itemId);
+  const at = checkedAt(ctx.id, itemId);
   row.classList.toggle('on', on);
   row.classList.toggle('skipped', sk);
   row.setAttribute('aria-checked', String(on));
@@ -634,7 +662,7 @@ function refreshRow(row, scene, itemId) {
     sb.textContent = sk ? '戻す' : 'スキップ';
     sb.setAttribute('aria-label', sk ? 'スキップを取り消す' : 'この項目をスキップ');
   }
-  hdr.innerHTML = sceneHeaderHTML(scene);
+  hdr.innerHTML = ctxHeaderHTML(ctx);
 }
 
 /* ---------------- 3. 設定 ---------------- */
@@ -642,18 +670,29 @@ function renderSettings() {
   hdr.innerHTML = `<div class="h-row"><h1 class="h-title">設定</h1></div>`;
 
   const days = Object.keys(state.log).length;
-  const items = state.scenes.reduce((n, s) => n + s.items.length, 0);
+  const items = state.contexts.reduce((n, s) => n + s.items.length, 0);
 
   main.innerHTML =
-    state.scenes.map((s, si) => `
+    state.contexts.map((s, si) => `
       <section class="sec">
-        <h2>場面 ${si + 1}</h2>
-        <p class="hint" style="margin:0 0 8px">場面選択画面に出す名前</p>
-        <input class="name-input" type="text" value="${esc(s.name)}" data-edit="scene" data-scene="${esc(s.id)}"
-               aria-label="場面の名前" maxlength="30">
+        <h2>コンテキスト ${si + 1}</h2>
+        <p class="hint" style="margin:0 0 8px">コンテキスト選択画面に出す名前</p>
+        <input class="name-input" type="text" value="${esc(s.name)}" data-edit="ctx" data-ctx="${esc(s.id)}"
+               aria-label="コンテキストの名前" maxlength="30">
         <p class="hint" style="margin:10px 0 0">項目（${s.items.length}件）／ ▲▼で並べ替え</p>
         ${itemEditorHTML(s)}
+        <div class="row-actions" style="margin-top:12px">
+          <button class="btn sm danger" data-act="delctx" data-ctx="${esc(s.id)}">このコンテキストを削除</button>
+        </div>
       </section>`).join('') + `
+
+    <section class="sec">
+      <h2>コンテキストを追加</h2>
+      <p class="hint">「出発前」「店を出る前」のような、チェックする場面の単位です。</p>
+      <div class="row-actions">
+        <button class="btn sm primary" data-act="addctx">＋ コンテキストを追加</button>
+      </div>
+    </section>
 
     <section class="sec">
       <h2>バックアップ</h2>
@@ -663,7 +702,8 @@ function renderSettings() {
         <button class="btn sm primary" data-act="export">⬇ JSONに書き出す</button>
         <button class="btn sm" data-act="import">⬆ JSONを読み込む</button>
       </div>
-      <div class="kv" style="margin-top:10px"><span>チェック項目</span><b>${items}件</b></div>
+      <div class="kv" style="margin-top:10px"><span>コンテキスト</span><b>${state.contexts.length}件</b></div>
+      <div class="kv"><span>チェック項目</span><b>${items}件</b></div>
       <div class="kv"><span>記録が残っている日数</span><b>${days}日分</b></div>
     </section>
 
@@ -688,7 +728,7 @@ function renderSettings() {
       </div>
     </section>`;
 
-  bar.innerHTML = `<button class="btn" data-act="home">← 場面選択</button>`;
+  bar.innerHTML = `<button class="btn" data-act="home">← 一覧</button>`;
 }
 
 /* =========================================================
@@ -696,28 +736,28 @@ function renderSettings() {
    ========================================================= */
 document.addEventListener('click', async (e) => {
   const goBtn = e.target.closest('[data-go]');
-  if (goBtn) { go('#/scene/' + encodeURIComponent(goBtn.dataset.go)); return; }
+  if (goBtn) { go('#/ctx/' + encodeURIComponent(goBtn.dataset.go)); return; }
 
   // 行の中の「スキップ」ボタン（行タップより先に処理する）
   const skipBtn = e.target.closest('.skipbtn');
   if (skipBtn) {
-    const scene = findScene(skipBtn.dataset.scene);
+    const ctx = findCtx(skipBtn.dataset.ctx);
     const row = skipBtn.closest('.item');
-    if (!scene || !row) return;
+    if (!ctx || !row) return;
     if (checkDayRollover()) return;
-    toggleSkip(scene.id, skipBtn.dataset.item);
-    refreshRow(row, scene, skipBtn.dataset.item);
+    toggleSkip(ctx.id, skipBtn.dataset.item);
+    refreshRow(row, ctx, skipBtn.dataset.item);
     if (navigator.vibrate) navigator.vibrate(12);
     return;
   }
 
   const item = e.target.closest('.item');
   if (item) {
-    const scene = findScene(item.dataset.scene);
-    if (!scene) return;
+    const ctx = findCtx(item.dataset.ctx);
+    if (!ctx) return;
     if (checkDayRollover()) return;           // 日付が変わっていたら作り直す
-    toggleItem(scene.id, item.dataset.item);
-    refreshRow(item, scene, item.dataset.item);
+    toggleItem(ctx.id, item.dataset.item);
+    refreshRow(item, ctx, item.dataset.item);
     if (navigator.vibrate) navigator.vibrate(12);
     return;
   }
@@ -725,46 +765,72 @@ document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-act]');
   if (!btn) return;
   const act = btn.dataset.act;
-  const scene = btn.dataset.scene ? findScene(btn.dataset.scene) : null;
+  const ctx = btn.dataset.ctx ? findCtx(btn.dataset.ctx) : null;
 
   switch (act) {
     case 'home':     go('#/'); break;
     case 'settings': go('#/settings'); break;
 
+    case 'addctx': {
+      const c = { id: uid(), name: '新しいコンテキスト', items: [] };
+      state.contexts.push(c);
+      save(true);
+      rerender();
+      const el = main.querySelector(`[data-edit="ctx"][data-ctx="${CSS.escape(c.id)}"]`);
+      if (el) { el.focus(); el.select(); el.scrollIntoView({ block: 'center' }); }
+      break;
+    }
+
+    case 'delctx': {
+      if (!ctx) break;
+      const ok = await confirmDialog({
+        title: `「${ctx.name}」を削除`,
+        body: `このコンテキストと、その中の項目 ${ctx.items.length}件、これまでの記録をすべて消します。\nこの操作は取り消せません。`,
+        ok: '削除する', danger: true,
+      });
+      if (!ok) break;
+      state.contexts = state.contexts.filter(c => c.id !== ctx.id);
+      for (const day of Object.values(state.log)) delete day[ctx.id];
+      save(true);
+      rerender();
+      toast(`「${ctx.name}」を削除しました`);
+      break;
+    }
+
     case 'edit':     editMode = true;  render(); break;
     case 'editdone': {
       editMode = false;
       // 空のまま残った項目は保存しない
-      for (const sc of state.scenes) sc.items = sc.items.filter(it => it.text.trim() !== '');
+      for (const sc of state.contexts) sc.items = sc.items.filter(it => it.text.trim() !== '');
       save(true);
       render();
       break;
     }
 
     case 'reset': {
-      if (!scene) break;
-      const p = progress(scene);
+      if (!ctx) break;
+      const p = progress(ctx);
       if (p.handled === 0) { toast('まだ記録がありません'); break; }
       const detail = p.skipped ? `チェック ${p.done}件・スキップ ${p.skipped}件` : `チェック ${p.done}件`;
       const ok = await confirmDialog({
-        title: `「${scene.name}」をリセット`,
+        title: `「${ctx.name}」をリセット`,
         body: `本日の${detail} と、その時刻の記録を消します。\nこの操作は取り消せません。`,
         ok: 'リセットする', danger: true,
       });
       if (!ok) break;
-      delete dayLog()[scene.id];
+      delete dayLog()[ctx.id];
       save(true);
       render(false);
-      toast(`「${scene.name}」をリセットしました`);
+      toast(`「${ctx.name}」をリセットしました`);
       break;
     }
 
     case 'add': {
-      if (!scene) break;
-      scene.items.push({ id: uid(), text: '' });
+      if (!ctx) break;
+      ctx.items.push({ id: uid(), text: '' });
       save(true);
       rerender();
-      const inputs = main.querySelectorAll(`[data-edit="item"][data-scene="${CSS.escape(scene.id)}"]`);
+      const inputs = main.querySelectorAll(`[data-edit="item"][data-ctx="${CSS.escape(ctx.id)}"]`);
       const last = inputs[inputs.length - 1];
       if (last) { last.focus(); last.scrollIntoView({ block: 'center' }); }
       break;
@@ -772,28 +838,28 @@ document.addEventListener('click', async (e) => {
 
     case 'up':
     case 'down': {
-      if (!scene) break;
-      const i = scene.items.findIndex(it => it.id === btn.dataset.item);
+      if (!ctx) break;
+      const i = ctx.items.findIndex(it => it.id === btn.dataset.item);
       const j = act === 'up' ? i - 1 : i + 1;
-      if (i < 0 || j < 0 || j >= scene.items.length) break;
-      [scene.items[i], scene.items[j]] = [scene.items[j], scene.items[i]];
+      if (i < 0 || j < 0 || j >= ctx.items.length) break;
+      [ctx.items[i], ctx.items[j]] = [ctx.items[j], ctx.items[i]];
       save(true);
       rerender();
       break;
     }
 
     case 'del': {
-      if (!scene) break;
-      const it = scene.items.find(x => x.id === btn.dataset.item);
+      if (!ctx) break;
+      const it = ctx.items.find(x => x.id === btn.dataset.item);
       if (!it) break;
       const ok = await confirmDialog({
         title: '項目を削除', body: it.text ? `「${it.text}」を削除します。` : 'この空の項目を削除します。',
         ok: '削除する', danger: true,
       });
       if (!ok) break;
-      scene.items = scene.items.filter(x => x.id !== it.id);
+      ctx.items = ctx.items.filter(x => x.id !== it.id);
       // 過去のチェック記録からも取り除く
-      for (const day of Object.values(state.log)) if (day[scene.id]) delete day[scene.id][it.id];
+      for (const day of Object.values(state.log)) if (day[ctx.id]) delete day[ctx.id][it.id];
       save(true);
       rerender();
       break;
@@ -846,11 +912,11 @@ document.addEventListener('keydown', (e) => {
 main.addEventListener('input', (e) => {
   const el = e.target.closest('[data-edit]');
   if (!el) return;
-  const scene = findScene(el.dataset.scene);
-  if (!scene) return;
-  if (el.dataset.edit === 'scene') scene.name = el.value;
+  const ctx = findCtx(el.dataset.ctx);
+  if (!ctx) return;
+  if (el.dataset.edit === 'ctx') ctx.name = el.value;
   else {
-    const it = scene.items.find(x => x.id === el.dataset.item);
+    const it = ctx.items.find(x => x.id === el.dataset.item);
     if (it) it.text = el.value;
   }
   save();
@@ -884,10 +950,10 @@ function importJSON() {
     catch (e) { toast('JSONとして読めませんでした'); return; }
     if (!isValidData(obj)) { toast('このアプリのバックアップではないようです'); return; }
     const n = normalize(obj);
-    const items = n.scenes.reduce((a, s) => a + s.items.length, 0);
+    const items = n.contexts.reduce((a, s) => a + s.items.length, 0);
     const ok = await confirmDialog({
       title: '読み込みますか？',
-      body: `場面 ${n.scenes.length}件／項目 ${items}件／記録 ${Object.keys(n.log).length}日分\n\n今この端末にあるデータは置き換わります。`,
+      body: `コンテキスト ${n.contexts.length}件／項目 ${items}件／記録 ${Object.keys(n.log).length}日分\n\n今この端末にあるデータは置き換わります。`,
       ok: '読み込む', danger: true,
     });
     if (!ok) return;

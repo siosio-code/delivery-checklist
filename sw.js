@@ -1,6 +1,6 @@
 // 納品チェックリスト - Service Worker
 // キャッシュ名の数字を変えると、次回オンライン時に新バージョンへ更新されます。
-const CACHE = 'checklist-v2';
+const CACHE = 'checklist-v3';
 
 const ASSETS = [
   './',
