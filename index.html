@@ -20,12 +20,12 @@
 :root{
   --bg:#0d1117; --card:#161d26; --card2:#202b36; --line:#333f4c; --press:#2b3846;
   --fg:#f2f6fa; --muted:#93a6b8; --field:#080b0f;
-  --ok:#22d37a; --ok-bg:#0e3222; --ok-line:#1f9d5e; --on-ok:#04250f;
-  --skip:#e6a640; --skip-bg:#2a2116; --skip-line:#8a6524;
-  --accent:#4da3ff; --primary-bg:#123f6d; --primary-fg:#dbeaff;
+  --ok:#ff7a2f; --ok-bg:#3a1e0c; --ok-line:#ff7a2f; --on-ok:#2a1002;
+  --skip:#94a6b8; --skip-bg:#1d242c; --skip-line:#4b5a68;
+  --accent:#ff7a2f; --primary-bg:#4a2410; --primary-fg:#ffd6bb;
   --danger:#ff8f8f; --danger-bg:#3d1717; --danger-line:#7d3030;
   --bar-bg:rgba(13,17,23,.97);
-  --toast-bg:#eef4fb; --toast-fg:#0d1117; --toast-link:#0b4ea2;
+  --toast-bg:#eef4fb; --toast-fg:#0d1117; --toast-link:#c2510c;
   --shadow:0 8px 24px rgba(0,0,0,.5);
   --bar-h:60px; --radius:12px;
 }
@@ -33,12 +33,12 @@
   :root{
     --bg:#f4f6f9; --card:#ffffff; --card2:#e9eef4; --line:#ccd6e0; --press:#dbe3ec;
     --fg:#101820; --muted:#5b6b7b; --field:#ffffff;
-    --ok:#0f9d58; --ok-bg:#e4f5ea; --ok-line:#0f9d58; --on-ok:#ffffff;
-    --skip:#a96a00; --skip-bg:#fdf2e0; --skip-line:#d6a24a;
-    --accent:#0b62c4; --primary-bg:#e2edfc; --primary-fg:#0b3f80;
+    --ok:#e2621b; --ok-bg:#fdeee3; --ok-line:#e2621b; --on-ok:#ffffff;
+    --skip:#5b6b7b; --skip-bg:#eaeef3; --skip-line:#b6c2ce;
+    --accent:#d95a11; --primary-bg:#fde7d7; --primary-fg:#8d3907;
     --danger:#a12222; --danger-bg:#fdecec; --danger-line:#e0a3a3;
     --bar-bg:rgba(244,246,249,.97);
-    --toast-bg:#1b2430; --toast-fg:#f2f6fa; --toast-link:#8bc0ff;
+    --toast-bg:#1b2430; --toast-fg:#f2f6fa; --toast-link:#ffa46a;
     --shadow:0 8px 24px rgba(16,24,32,.18);
   }
 }
@@ -62,6 +62,7 @@ button{cursor:pointer}
 }
 .h-row{display:flex; align-items:baseline; gap:8px}
 .h-title{font-size:18px; font-weight:700; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.h-title .dot{color:var(--accent)}
 .h-sub{font-size:12px; color:var(--muted); margin-top:5px}
 .h-count{margin-left:auto; font-size:17px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
 .h-count.done{color:var(--ok)}
@@ -223,7 +224,7 @@ function defaultData() {
   const mk = (name, items) => ({ id: uid(), name, items: items.map(t => ({ id: uid(), text: t })) });
   return {
     version: 3,
-    settings: { keepAwake: true },
+    settings: { keepAwake: true, sound: true },
     contexts: [
       mk('出発前', [
         '納品書・伝票を持ったか',
@@ -309,7 +310,7 @@ function isValidData(o) {
 function normalize(o) {
   const d = {
     version: 3,
-    settings: Object.assign({ keepAwake: true }, o.settings || {}),
+    settings: Object.assign({ keepAwake: true, sound: true }, o.settings || {}),
     contexts: contextsOf(o).map(s => ({
       id: s.id || uid(),
       name: String(s.name),
@@ -477,6 +478,43 @@ function confirmDialog({ title, body = '', ok = 'OK', cancel = 'やめる', dang
     };
     setTimeout(() => { const b = m.querySelector('[data-a="ok"]'); if (b) b.focus(); }, 0);
   });
+}
+
+/* =========================================================
+   効果音（チェックを入れたときの「ピコン」）
+   音声ファイルは持たず、その場で合成する（オフラインでも鳴る）
+   ========================================================= */
+let audioCtx = null;
+function playCheckSound() {
+  if (!state.settings.sound) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try {
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const t0 = audioCtx.currentTime;
+    const master = audioCtx.createGain();
+    master.gain.value = 0.18;
+    master.connect(audioCtx.destination);
+
+    // 「ピ」→「コン」。短い高音のあと、少し高い音を余韻つきで重ねる
+    const blip = (freq, start, dur, peak, type = 'sine') => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t0 + start);
+      gain.gain.setValueAtTime(0.0001, t0 + start);
+      gain.gain.exponentialRampToValueAtTime(peak, t0 + start + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+      osc.connect(gain); gain.connect(master);
+      osc.start(t0 + start);
+      osc.stop(t0 + start + dur + 0.02);
+    };
+    blip(1046.5, 0,     0.085, 0.55);          // ピ（C6）
+    blip(1568.0, 0.052, 0.26,  0.65);          // コン（G6）
+    blip(3136.0, 0.052, 0.10,  0.12, 'triangle'); // 上の倍音を少しだけ足して抜けを良くする
+  } catch (e) { /* 音が出せない環境は黙って無視 */ }
 }
 
 /* =========================================================
@@ -708,6 +746,18 @@ function renderSettings() {
     </section>
 
     <section class="sec">
+      <h2>音</h2>
+      <p class="hint">チェックを入れたときに短い音が鳴ります（外すときとスキップは鳴りません）。
+端末のメディア音量が0だと鳴りません。</p>
+      <div class="row-actions">
+        <button class="btn sm ${state.settings.sound ? 'primary' : ''}" data-act="sound">
+          ${state.settings.sound ? '✓ 音を鳴らす（オン）' : '音を鳴らす（オフ）'}
+        </button>
+        <button class="btn sm" data-act="soundtest">▶ 試す</button>
+      </div>
+    </section>
+
+    <section class="sec">
       <h2>画面スリープ</h2>
       <p class="hint">オンにすると、このアプリを開いている間は画面が消えません（Wake Lock）。
 端末の電池セーバー中は効かないことがあります。</p>
@@ -758,6 +808,7 @@ document.addEventListener('click', async (e) => {
     if (checkDayRollover()) return;           // 日付が変わっていたら作り直す
     toggleItem(ctx.id, item.dataset.item);
     refreshRow(item, ctx, item.dataset.item);
+    if (isChecked(ctx.id, item.dataset.item)) playCheckSound();   // 外すときは鳴らさない
     if (navigator.vibrate) navigator.vibrate(12);
     return;
   }
@@ -862,6 +913,24 @@ document.addEventListener('click', async (e) => {
       for (const day of Object.values(state.log)) if (day[ctx.id]) delete day[ctx.id][it.id];
       save(true);
       rerender();
+      break;
+    }
+
+    case 'sound': {
+      state.settings.sound = !state.settings.sound;
+      save(true);
+      if (state.settings.sound) playCheckSound();
+      rerender();
+      toast(state.settings.sound ? '音を鳴らします' : '音を鳴らしません');
+      break;
+    }
+
+    case 'soundtest': {
+      const was = state.settings.sound;
+      state.settings.sound = true;
+      playCheckSound();
+      state.settings.sound = was;
+      if (!was) toast('今は「オフ」です。オンにすると毎回鳴ります');
       break;
     }
 
