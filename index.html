@@ -591,8 +591,8 @@ function bell(ac, out, freq, start, dur, peak) {
   });
 }
 
-/* notes: [周波数, 開始秒, 長さ秒, 音量] の配列を鳴らす */
-function playBells(notes, volume) {
+/* notes: [周波数, 開始秒, 長さ秒, 音量] の配列を鳴らす。wet は残響の量 */
+function playBells(notes, volume, wetAmount = 0.32) {
   const ac = ensureAudio();
   if (!ac) return;
   try {
@@ -601,7 +601,7 @@ function playBells(notes, volume) {
     master.connect(ac.destination);
     // 少しだけ残響を混ぜて「解除された」感を出す
     const wet = ac.createGain();
-    wet.gain.value = 0.32;
+    wet.gain.value = wetAmount;
     wet.connect(master);
     getReverb(ac).connect(wet);
     const dry = ac.createGain();
@@ -621,11 +621,24 @@ const SOUNDS = {
   // 以前のシンプルな「ピコン」
   pico:   [[1046.50, 0,     0.16, 0.55],
            [1567.98, 0.052, 0.34, 0.6]],
+  // チェックを外したとき：下がる2音を短く、余韻は少なめ
+  uncheck: [[880.00, 0,     0.16, 0.45],   // A5
+            [587.33, 0.048, 0.26, 0.5]],   // D5
+  // スキップ：低めの1音で「トン」と流す
+  skip:    [[493.88, 0,     0.20, 0.5]],   // B4
 };
 
 function playCheckSound() {
   if (!state.settings.sound) return;
   playBells(SOUNDS[state.settings.soundStyle] || SOUNDS.unlock, 0.18);
+}
+function playUncheckSound() {
+  if (!state.settings.sound) return;
+  playBells(SOUNDS.uncheck, 0.13, 0.12);
+}
+function playSkipSound() {
+  if (!state.settings.sound) return;
+  playBells(SOUNDS.skip, 0.13, 0.10);
 }
 
 /* リマインダーは、チェック音と区別できるよう上がっていく3音を2回 */
@@ -977,14 +990,14 @@ function renderSettings() {
 
     <section class="sec">
       <h2>音</h2>
-      <p class="hint">チェックを入れたときに短い音が鳴ります（外すときとスキップは鳴りません）。
+      <p class="hint">チェックを入れたとき・外したとき・スキップしたときに、それぞれ別の短い音が鳴ります。
 端末のメディア音量が0だと鳴りません。</p>
       <div class="row-actions">
         <button class="btn sm ${state.settings.sound ? 'primary' : ''}" data-act="sound">
           ${state.settings.sound ? '✓ 音を鳴らす（オン）' : '音を鳴らす（オフ）'}
         </button>
       </div>
-      <p class="hint" style="margin:12px 0 0">音の種類（押すと試せます）</p>
+      <p class="hint" style="margin:12px 0 0">チェックを入れたときの音（押すと試せます）</p>
       <div class="row-actions">
         <button class="btn sm ${state.settings.soundStyle !== 'pico' ? 'primary' : ''}" data-act="style" data-style="unlock">
           ${state.settings.soundStyle !== 'pico' ? '✓ ' : ''}実績解除ふう
@@ -1057,6 +1070,7 @@ document.addEventListener('click', async (e) => {
     if (checkDayRollover()) return;
     toggleSkip(ctx.id, skipBtn.dataset.item);
     refreshRow(row, ctx, skipBtn.dataset.item);
+    if (isSkipped(ctx.id, skipBtn.dataset.item)) playSkipSound(); else playUncheckSound();
     buzz(12);
     return;
   }
@@ -1068,7 +1082,7 @@ document.addEventListener('click', async (e) => {
     if (checkDayRollover()) return;           // 日付が変わっていたら作り直す
     toggleItem(ctx.id, item.dataset.item);
     refreshRow(item, ctx, item.dataset.item);
-    if (isChecked(ctx.id, item.dataset.item)) playCheckSound();   // 外すときは鳴らさない
+    if (isChecked(ctx.id, item.dataset.item)) playCheckSound(); else playUncheckSound();
     buzz(12);
     return;
   }
