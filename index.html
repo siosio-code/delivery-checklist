@@ -186,6 +186,38 @@ main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
 .sheet p{margin:0 0 14px; font-size:14px; color:var(--muted); line-height:1.55; white-space:pre-wrap}
 .sheet .acts{display:flex; gap:8px}
 .sheet .acts .btn{flex:1}
+/* リマインダーの通知帯 */
+#alert{
+  position:fixed; left:8px; right:8px; z-index:65;
+  bottom:calc(var(--bar-h) + 10px + env(safe-area-inset-bottom));
+  background:var(--accent); color:#fff; border-radius:14px; padding:12px;
+  box-shadow:var(--shadow); display:flex; flex-direction:column; gap:9px;
+}
+#alert[hidden]{display:none}
+.alert-title{font-size:13px; font-weight:800; opacity:.9}
+.alert-body{font-size:15px; font-weight:700; line-height:1.5; font-variant-numeric:tabular-nums}
+.alert-ctx{font-size:11px; font-weight:700; opacity:.85; margin-left:8px;
+  border:1px solid rgba(255,255,255,.55); border-radius:6px; padding:1px 5px}
+.alert-acts{display:flex; gap:8px}
+.alert-acts .btn{flex:1; min-height:40px; font-size:14px;
+  background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.6); color:#fff}
+.alert-acts .btn:active{background:rgba(255,255,255,.3)}
+
+/* 行に出すリマインド時刻 */
+.chip{
+  flex:0 0 auto; font-size:11px; font-weight:800; padding:4px 6px; border-radius:8px;
+  color:var(--muted); border:1px solid var(--line); font-variant-numeric:tabular-nums;
+}
+.chip.due{color:#fff; background:var(--accent); border-color:var(--accent)}
+
+/* 編集画面の時刻入力 */
+.remind-row{display:flex; align-items:center; gap:6px; margin-right:auto}
+.remind-row input[type=time]{
+  padding:7px 8px; font-size:14px; font-variant-numeric:tabular-nums;
+  background:var(--field); color:var(--fg); border:1px solid var(--line); border-radius:9px;
+}
+.remind-row .lbl{font-size:14px; color:var(--muted)}
+
 #toast{
   position:fixed; left:50%; transform:translateX(-50%);
   bottom:calc(var(--bar-h) + 14px + env(safe-area-inset-bottom)); z-index:70;
@@ -204,6 +236,7 @@ main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
 <main id="main"></main>
 <nav id="bar"></nav>
 <div id="modal" hidden></div>
+<div id="alert" role="alert" hidden></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <noscript><p style="padding:20px">このアプリはJavaScriptが必要です。</p></noscript>
 <script>
@@ -223,8 +256,8 @@ const KEEP_DAYS      = 60;  // チェック履歴の保持日数
 function defaultData() {
   const mk = (name, items) => ({ id: uid(), name, items: items.map(t => ({ id: uid(), text: t })) });
   return {
-    version: 3,
-    settings: { keepAwake: true, sound: true },
+    version: 4,
+    settings: { keepAwake: true, sound: true, soundStyle: 'unlock', remind: true },
     contexts: [
       mk('出発前', [
         '納品書・伝票を持ったか',
@@ -254,6 +287,8 @@ function defaultData() {
     ],
     // log[業務日][コンテキストID][項目ID] = { at: 時刻(epoch ms), skip: true(スキップの場合) }
     log: {},
+    // notified[業務日][項目ID] = リマインドを出した時刻。1日1回だけ出すための記録
+    notified: {},
   };
 }
 
@@ -309,16 +344,21 @@ function isValidData(o) {
 
 function normalize(o) {
   const d = {
-    version: 3,
-    settings: Object.assign({ keepAwake: true, sound: true }, o.settings || {}),
+    version: 4,
+    settings: Object.assign({ keepAwake: true, sound: true, soundStyle: 'unlock', remind: true }, o.settings || {}),
     contexts: contextsOf(o).map(s => ({
       id: s.id || uid(),
       name: String(s.name),
       items: (s.items || [])
         .filter(it => it && typeof it.text === 'string')
-        .map(it => ({ id: it.id || uid(), text: String(it.text) })),
+        .map(it => {
+          const item = { id: it.id || uid(), text: String(it.text) };
+          if (typeof it.remind === 'string' && /^\d{1,2}:\d{2}$/.test(it.remind)) item.remind = it.remind;
+          return item;
+        }),
     })),
     log: {},
+    notified: {},
   };
   for (const [day, contexts] of Object.entries(o.log || {})) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !contexts || typeof contexts !== 'object') continue;
@@ -337,6 +377,14 @@ function normalize(o) {
       if (Object.keys(ii).length) dd[sid] = ii;
     }
     if (Object.keys(dd).length) d.log[day] = dd;
+  }
+  for (const [day, ids] of Object.entries(o.notified || {})) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !ids || typeof ids !== 'object') continue;
+    d.notified[day] = {};
+    for (const [iid, at] of Object.entries(ids)) {
+      const n = Number(at);
+      if (Number.isFinite(n) && n > 0) d.notified[day][iid] = n;
+    }
   }
   return d;
 }
@@ -377,6 +425,9 @@ function pruneLog() {
   let removed = 0;
   for (const day of Object.keys(state.log)) {
     if (daysBetween(today, day) >= KEEP_DAYS) { delete state.log[day]; removed++; }
+  }
+  for (const day of Object.keys(state.notified || {})) {
+    if (daysBetween(today, day) >= KEEP_DAYS) delete state.notified[day];
   }
   return removed;
 }
@@ -481,40 +532,197 @@ function confirmDialog({ title, body = '', ok = 'OK', cancel = 'やめる', dang
 }
 
 /* =========================================================
-   効果音（チェックを入れたときの「ピコン」）
+   効果音
    音声ファイルは持たず、その場で合成する（オフラインでも鳴る）
    ========================================================= */
 let audioCtx = null;
+let reverbIR = null;
+
+/* 画面に一度も触れていない状態での振動はブラウザに拒否される（起動直後のリマインド等） */
+function buzz(pattern) {
+  try {
+    if (!navigator.vibrate) return;
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    navigator.vibrate(pattern);
+  } catch (e) { /* 無視 */ }
+}
+
+function ensureAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') { const r = audioCtx.resume(); if (r && r.catch) r.catch(() => {}); }
+  return audioCtx;
+}
+
+/* 金属的な余韻を作るための短い残響（1回だけ生成して使い回す） */
+function getReverb(ac) {
+  if (reverbIR) return reverbIR;
+  const len = Math.floor(ac.sampleRate * 1.1);
+  const buf = ac.createBuffer(2, len, ac.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+    }
+  }
+  const conv = ac.createConvolver();
+  conv.buffer = buf;
+  reverbIR = conv;
+  return conv;
+}
+
+/* ベルの音色（基音＋わずかにずらした倍音。上の倍音ほど速く減衰する） */
+function bell(ac, out, freq, start, dur, peak) {
+  const PARTIALS = [[1, 1], [2.01, 0.42], [3.01, 0.22], [4.07, 0.11], [5.43, 0.06]];
+  const t0 = ac.currentTime + start;
+  PARTIALS.forEach(([mul, amp], i) => {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq * mul, t0);
+    const life = dur * Math.pow(0.62, i);   // 上の倍音ほど短く消える
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak * amp, t0 + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + life);
+    osc.connect(g); g.connect(out);
+    osc.start(t0);
+    osc.stop(t0 + life + 0.03);
+  });
+}
+
+/* notes: [周波数, 開始秒, 長さ秒, 音量] の配列を鳴らす */
+function playBells(notes, volume) {
+  const ac = ensureAudio();
+  if (!ac) return;
+  try {
+    const master = ac.createGain();
+    master.gain.value = volume;
+    master.connect(ac.destination);
+    // 少しだけ残響を混ぜて「解除された」感を出す
+    const wet = ac.createGain();
+    wet.gain.value = 0.32;
+    wet.connect(master);
+    getReverb(ac).connect(wet);
+    const dry = ac.createGain();
+    dry.gain.value = 1;
+    dry.connect(master);
+    const bus = ac.createGain();
+    bus.connect(dry);
+    bus.connect(getReverb(ac));
+    for (const [f, t, d, p] of notes) bell(ac, bus, f, t, d, p);
+  } catch (e) { /* 音が出せない環境は黙って無視 */ }
+}
+
+const SOUNDS = {
+  // Steamの実績解除のような、明るく上がっていく2音＋余韻
+  unlock: [[1318.51, 0,     0.75, 0.5],   // E6
+           [1975.53, 0.085, 1.05, 0.6]],  // B6
+  // 以前のシンプルな「ピコン」
+  pico:   [[1046.50, 0,     0.16, 0.55],
+           [1567.98, 0.052, 0.34, 0.6]],
+};
+
 function playCheckSound() {
   if (!state.settings.sound) return;
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
+  playBells(SOUNDS[state.settings.soundStyle] || SOUNDS.unlock, 0.18);
+}
+
+/* リマインダーは、チェック音と区別できるよう上がっていく3音を2回 */
+function playReminderSound() {
+  playBells([
+    [1046.50, 0,    0.5, 0.5], [1318.51, 0.11, 0.5, 0.5], [1567.98, 0.22, 0.9, 0.6],
+    [1046.50, 0.62, 0.5, 0.5], [1318.51, 0.73, 0.5, 0.5], [1567.98, 0.84, 1.0, 0.6],
+  ], 0.22);
+}
+
+/* =========================================================
+   リマインダー
+   アプリを開いている間に、指定時刻を過ぎた未処理の項目を知らせる
+   ========================================================= */
+
+/* 業務日 dayKey における、その項目のリマインド時刻（epoch ms）。未設定なら0 */
+function remindTs(item, dayKey = today) {
+  if (!item.remind) return 0;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(item.remind);
+  if (!m) return 0;
+  const [y, mo, d] = dayKey.split('-').map(Number);
+  const h = Number(m[1]), mi = Number(m[2]);
+  const dt = new Date(y, mo - 1, d, h, mi, 0, 0);
+  // 午前4時より前の時刻は、業務日としては翌日の未明にあたる
+  if (h < DAY_START_HOUR) dt.setDate(dt.getDate() + 1);
+  return dt.getTime();
+}
+function isOverdue(ctx, item) {
+  const ts = remindTs(item);
+  return !!ts && Date.now() >= ts && !isChecked(ctx.id, item.id) && !isSkipped(ctx.id, item.id);
+}
+
+let alertQueue = [];
+function checkReminders() {
+  if (!state.settings.remind) return;
+  if (!state.notified) state.notified = {};
+  const nd = state.notified[today] || (state.notified[today] = {});
+  const due = [];
+  for (const c of state.contexts) {
+    for (const it of c.items) {
+      if (nd[it.id]) continue;
+      if (!isOverdue(c, it)) continue;
+      nd[it.id] = Date.now();
+      due.push({ ctxId: c.id, ctxName: c.name, text: it.text, at: it.remind });
+    }
+  }
+  if (!due.length) return;
+  save(true);
+  alertQueue = due;
+  showAlert(due);
+  playReminderSound();
+  buzz([180, 90, 180]);
+  notifyOS(due);
+  if (route().view === 'ctx') render(false);   // 行の表示も更新する
+}
+
+function showAlert(due) {
+  const el = $('#alert');
+  const lines = due.map(d => `${esc(d.at)}　${esc(d.text)}<span class="alert-ctx">${esc(d.ctxName)}</span>`).join('<br>');
+  el.innerHTML = `
+    <div class="alert-title">⏰ 時間になりました</div>
+    <div class="alert-body">${lines}</div>
+    <div class="alert-acts">
+      <button class="btn" data-act="alert-close">閉じる</button>
+      <button class="btn" data-act="alert-open" data-ctx="${esc(due[0].ctxId)}">開く</button>
+    </div>`;
+  el.hidden = false;
+}
+function hideAlert() { const el = $('#alert'); el.hidden = true; el.innerHTML = ''; alertQueue = []; }
+
+/* 端末の通知（許可されているときだけ。アプリを閉じていると出ないことがある） */
+function notifyOS(due) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const title = '⏰ ' + due[0].text;
+  const body = due.length > 1
+    ? `${due[0].ctxName} ほか ${due.length}件`
+    : `${due[0].ctxName}　${due[0].at}`;
+  const opts = { body, tag: 'checklist-remind', renotify: true, icon: './icons/icon-192.png', badge: './icons/icon-192.png' };
   try {
-    if (!audioCtx) audioCtx = new AC();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready.then(reg => reg.showNotification(title, opts)).catch(() => {});
+    } else {
+      new Notification(title, opts);
+    }
+  } catch (e) { /* 通知が使えない環境は無視 */ }
+}
 
-    const t0 = audioCtx.currentTime;
-    const master = audioCtx.createGain();
-    master.gain.value = 0.18;
-    master.connect(audioCtx.destination);
-
-    // 「ピ」→「コン」。短い高音のあと、少し高い音を余韻つきで重ねる
-    const blip = (freq, start, dur, peak, type = 'sine') => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, t0 + start);
-      gain.gain.setValueAtTime(0.0001, t0 + start);
-      gain.gain.exponentialRampToValueAtTime(peak, t0 + start + 0.006);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
-      osc.connect(gain); gain.connect(master);
-      osc.start(t0 + start);
-      osc.stop(t0 + start + dur + 0.02);
-    };
-    blip(1046.5, 0,     0.085, 0.55);          // ピ（C6）
-    blip(1568.0, 0.052, 0.26,  0.65);          // コン（G6）
-    blip(3136.0, 0.052, 0.10,  0.12, 'triangle'); // 上の倍音を少しだけ足して抜けを良くする
-  } catch (e) { /* 音が出せない環境は黙って無視 */ }
+async function askNotifyPermission() {
+  if (!('Notification' in window)) { toast('この端末は通知に対応していません'); return; }
+  if (Notification.permission === 'granted') { toast('通知はすでに許可されています'); return; }
+  if (Notification.permission === 'denied') {
+    toast('ブラウザの設定で通知がブロックされています', 4200);
+    return;
+  }
+  const r = await Notification.requestPermission();
+  toast(r === 'granted' ? '通知を許可しました' : '通知は許可されませんでした');
+  rerender();
 }
 
 /* =========================================================
@@ -536,7 +744,7 @@ async function releaseWakeLock() {
   wakeLock = null;
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') { checkDayRollover(); acquireWakeLock(); }
+  if (document.visibilityState === 'visible') { if (!checkDayRollover()) checkReminders(); acquireWakeLock(); }
 });
 
 /* =========================================================
@@ -640,6 +848,12 @@ function itemEditorHTML(ctx) {
       <input type="text" value="${esc(it.text)}" data-edit="item" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
              aria-label="項目の内容" maxlength="80" placeholder="項目を入力">
       <div class="edit-tools">
+        <span class="remind-row">
+          <input type="time" value="${esc(it.remind || '')}" data-edit="remind"
+                 data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}" aria-label="リマインドする時刻">
+          ${it.remind ? `<button class="btn sm" data-act="unremind" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
+                   aria-label="リマインドを解除">解除</button>` : ''}
+        </span>
         <button class="iconbtn" data-act="up" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
                 aria-label="上へ移動" ${i === 0 ? 'disabled' : ''}>▲</button>
         <button class="iconbtn" data-act="down" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
@@ -661,6 +875,7 @@ function itemRowHTML(ctx, it) {
          data-item="${esc(it.id)}" data-ctx="${esc(ctx.id)}">
       <span class="box">${CHECK_SVG}</span>
       <span class="txt">${esc(it.text)}</span>
+      ${it.remind ? `<span class="chip ${isOverdue(ctx, it) ? 'due' : ''}">⏰${esc(it.remind)}</span>` : ''}
       <span class="at">${at ? hhmm(at) : ''}</span>
       <button class="skipbtn" data-act="skip" data-ctx="${esc(ctx.id)}" data-item="${esc(it.id)}"
               aria-label="${sk ? 'スキップを取り消す' : 'この項目をスキップ'}">${sk ? '戻す' : 'スキップ'}</button>
@@ -701,6 +916,21 @@ function refreshRow(row, ctx, itemId) {
     sb.setAttribute('aria-label', sk ? 'スキップを取り消す' : 'この項目をスキップ');
   }
   hdr.innerHTML = ctxHeaderHTML(ctx);
+}
+
+function notifyState() {
+  return ('Notification' in window) ? Notification.permission : 'unsupported';
+}
+/* 設定画面に、いま入っているリマインドの一覧を出す */
+function remindList() {
+  const rows = [];
+  for (const c of state.contexts) {
+    for (const it of c.items) if (it.remind) rows.push({ t: it.remind, name: it.text, c: c.name });
+  }
+  if (!rows.length) return `<div class="kv" style="margin-top:8px"><span>設定中のリマインド</span><b>なし</b></div>`;
+  rows.sort((a, b) => a.t.localeCompare(b.t));
+  return `<div style="margin-top:8px">` + rows.map(r =>
+    `<div class="kv"><span>${esc(r.t)}　${esc(r.name)}</span><b>${esc(r.c)}</b></div>`).join('') + `</div>`;
 }
 
 /* ---------------- 3. 設定 ---------------- */
@@ -753,8 +983,38 @@ function renderSettings() {
         <button class="btn sm ${state.settings.sound ? 'primary' : ''}" data-act="sound">
           ${state.settings.sound ? '✓ 音を鳴らす（オン）' : '音を鳴らす（オフ）'}
         </button>
-        <button class="btn sm" data-act="soundtest">▶ 試す</button>
       </div>
+      <p class="hint" style="margin:12px 0 0">音の種類（押すと試せます）</p>
+      <div class="row-actions">
+        <button class="btn sm ${state.settings.soundStyle !== 'pico' ? 'primary' : ''}" data-act="style" data-style="unlock">
+          ${state.settings.soundStyle !== 'pico' ? '✓ ' : ''}実績解除ふう
+        </button>
+        <button class="btn sm ${state.settings.soundStyle === 'pico' ? 'primary' : ''}" data-act="style" data-style="pico">
+          ${state.settings.soundStyle === 'pico' ? '✓ ' : ''}ピコン
+        </button>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h2>リマインダー</h2>
+      <p class="hint">項目ごとに時刻を決めておくと、その時刻を過ぎてもチェックもスキップもされていない項目を知らせます。
+時刻は「✎ 編集」または上のコンテキストの編集欄で、項目ごとに ⏰ から設定します。</p>
+      <div class="row-actions">
+        <button class="btn sm ${state.settings.remind ? 'primary' : ''}" data-act="remind">
+          ${state.settings.remind ? '✓ 知らせる（オン）' : '知らせる（オフ）'}
+        </button>
+        <button class="btn sm ${notifyState() === 'granted' ? 'primary' : ''}" data-act="notifyperm">
+          ${notifyState() === 'granted' ? '✓ 端末の通知は許可済み'
+            : notifyState() === 'denied' ? '端末の通知はブロック中'
+            : '端末の通知を許可する'}
+        </button>
+      </div>
+      <p class="hint" style="margin:12px 0 0">
+        <b>アプリを開いている間は確実に鳴ります。</b>
+        閉じている間や、他のアプリを長く使っている間は鳴らないことがあります
+        （サーバーを持たない作りのため、端末の目覚まし代わりにはなりません）。
+      </p>
+      ${remindList()}
     </section>
 
     <section class="sec">
@@ -797,7 +1057,7 @@ document.addEventListener('click', async (e) => {
     if (checkDayRollover()) return;
     toggleSkip(ctx.id, skipBtn.dataset.item);
     refreshRow(row, ctx, skipBtn.dataset.item);
-    if (navigator.vibrate) navigator.vibrate(12);
+    buzz(12);
     return;
   }
 
@@ -809,7 +1069,7 @@ document.addEventListener('click', async (e) => {
     toggleItem(ctx.id, item.dataset.item);
     refreshRow(item, ctx, item.dataset.item);
     if (isChecked(ctx.id, item.dataset.item)) playCheckSound();   // 外すときは鳴らさない
-    if (navigator.vibrate) navigator.vibrate(12);
+    buzz(12);
     return;
   }
 
@@ -821,6 +1081,25 @@ document.addEventListener('click', async (e) => {
   switch (act) {
     case 'home':     go('#/'); break;
     case 'settings': go('#/settings'); break;
+
+    case 'alert-close': hideAlert(); break;
+    case 'alert-open': {
+      const id = btn.dataset.ctx;
+      hideAlert();
+      if (id && findCtx(id)) go('#/ctx/' + encodeURIComponent(id));
+      break;
+    }
+
+    case 'unremind': {
+      if (!ctx) break;
+      const it = ctx.items.find(x => x.id === btn.dataset.item);
+      if (!it) break;
+      delete it.remind;
+      if (state.notified[today]) delete state.notified[today][it.id];
+      save(true);
+      rerender();
+      break;
+    }
 
     case 'addctx': {
       const c = { id: uid(), name: '新しいコンテキスト', items: [] };
@@ -925,14 +1204,27 @@ document.addEventListener('click', async (e) => {
       break;
     }
 
-    case 'soundtest': {
+    case 'style': {
+      state.settings.soundStyle = btn.dataset.style === 'pico' ? 'pico' : 'unlock';
+      save(true);
       const was = state.settings.sound;
       state.settings.sound = true;
       playCheckSound();
       state.settings.sound = was;
-      if (!was) toast('今は「オフ」です。オンにすると毎回鳴ります');
+      rerender();
       break;
     }
+
+    case 'remind': {
+      state.settings.remind = !state.settings.remind;
+      save(true);
+      if (state.settings.remind) checkReminders(); else hideAlert();
+      rerender();
+      toast(state.settings.remind ? '時刻になったら知らせます' : 'リマインダーを止めました');
+      break;
+    }
+
+    case 'notifyperm': await askNotifyPermission(); break;
 
     case 'keepawake': {
       state.settings.keepAwake = !state.settings.keepAwake;
@@ -977,17 +1269,28 @@ document.addEventListener('keydown', (e) => {
   row.click();
 });
 
+/* 時刻を決め終わったら画面を作り直す（設定の一覧と解除ボタンの表示を合わせる） */
+main.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-edit="remind"]');
+  if (el) { save(true); rerender(); }
+});
+
 /* テキスト編集（再描画せずに保存＝入力中にカーソルが飛ばない） */
 main.addEventListener('input', (e) => {
   const el = e.target.closest('[data-edit]');
   if (!el) return;
   const ctx = findCtx(el.dataset.ctx);
   if (!ctx) return;
+  const it = ctx.items.find(x => x.id === el.dataset.item);
   if (el.dataset.edit === 'ctx') ctx.name = el.value;
-  else {
-    const it = ctx.items.find(x => x.id === el.dataset.item);
-    if (it) it.text = el.value;
+  else if (el.dataset.edit === 'remind') {
+    if (it) {
+      if (el.value) it.remind = el.value; else delete it.remind;
+      // 時刻を変えたら、その日の「通知済み」を取り消して出し直せるようにする
+      if (state.notified[today]) delete state.notified[today][it.id];
+    }
   }
+  else if (it) it.text = el.value;
   save();
 });
 
@@ -1045,11 +1348,12 @@ function checkDayRollover() {
   today = k;
   pruneLog();
   save(true);
+  hideAlert();
   render();
   toast('日付が変わりました。新しい1日として始めます', 4000);
   return true;
 }
-setInterval(checkDayRollover, 30000);
+setInterval(() => { if (!checkDayRollover()) checkReminders(); }, 20000);
 
 /* =========================================================
    Service Worker（オフライン動作）
@@ -1086,6 +1390,7 @@ today = businessDateKey();
 pruneLog();
 save(true);
 render();
+checkReminders();
 acquireWakeLock();
 })();
 </script>

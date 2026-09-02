@@ -1,6 +1,6 @@
 // 納品チェックリスト - Service Worker
 // キャッシュ名の数字を変えると、次回オンライン時に新バージョンへ更新されます。
-const CACHE = 'checklist-v4';
+const CACHE = 'checklist-v5';
 
 const ASSETS = [
   './',
@@ -25,6 +25,17 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('message', (e) => {
   if (e.data === 'skip-waiting') self.skipWaiting();
+});
+
+// リマインダーの通知をタップしたら、開いているアプリに戻す（なければ開く）
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) if ('focus' in c) return c.focus();
+      if (self.clients.openWindow) return self.clients.openWindow('./');
+    })
+  );
 });
 
 // キャッシュ優先（オフラインで確実に起動する）。裏で更新を取りに行く。
