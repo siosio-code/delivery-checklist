@@ -1,0 +1,1939 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Due</title>
+<meta name="description" content="時間になるまで鳴り続けるリマインダー（端末内保存・オフライン動作）">
+<meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Due">
+<style>
+/* ---------- 配色（既定＝ダーク。端末がライトならライトへ切り替わる） ---------- */
+:root{
+  --bg:#0f1115; --card:#181d25; --card2:#222a35; --line:#36404d; --press:#2d3846;
+  --fg:#f2f6fa; --muted:#93a6b8; --field:#090c10;
+  --accent:#ff4d4f; --accent-bg:#3a1214; --accent-line:#ff4d4f; --on-accent:#2a0507;
+  --primary-bg:#4a1416; --primary-fg:#ffd2d3;
+  --ok:#3ecf8e; --ok-bg:#0f2a20; --ok-line:#2e8a63;
+  --later:#f0b429; --later-bg:#2e2410; --later-line:#7a5f1c;
+  --danger:#ff8f8f; --danger-bg:#3d1717; --danger-line:#7d3030;
+  --bar-bg:rgba(15,17,21,.97);
+  --toast-bg:#eef4fb; --toast-fg:#0f1115; --toast-link:#c22b2d;
+  --shadow:0 8px 24px rgba(0,0,0,.5);
+  --bar-h:60px; --radius:12px;
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --card2:#e9eef4; --line:#ccd6e0; --press:#dbe3ec;
+    --fg:#101820; --muted:#5b6b7b; --field:#ffffff;
+    --accent:#d92b2b; --accent-bg:#fdecec; --accent-line:#d92b2b; --on-accent:#ffffff;
+    --primary-bg:#fde0e0; --primary-fg:#8d1010;
+    --ok:#137a4e; --ok-bg:#e6f6ee; --ok-line:#8fcfb2;
+    --later:#8a6410; --later-bg:#fbf1d9; --later-line:#dcc079;
+    --danger:#a12222; --danger-bg:#fdecec; --danger-line:#e0a3a3;
+    --bar-bg:rgba(244,246,249,.97);
+    --toast-bg:#1b2430; --toast-fg:#f2f6fa; --toast-link:#ff9a9a;
+    --shadow:0 8px 24px rgba(16,24,32,.18);
+  }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Noto Sans JP",Meiryo,sans-serif;
+  font-size:15px; line-height:1.4;
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior-y:contain;
+  padding-bottom:calc(var(--bar-h) + env(safe-area-inset-bottom));
+}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+
+/* ---------- ヘッダー ---------- */
+#hdr{
+  position:sticky; top:0; z-index:20; background:var(--bg);
+  padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
+}
+.h-row{display:flex; align-items:baseline; gap:8px}
+.h-title{font-size:18px; font-weight:700; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.h-title .dot{color:var(--accent)}
+.h-sub{font-size:12px; color:var(--muted); margin-top:5px; font-variant-numeric:tabular-nums}
+.h-count{margin-left:auto; font-size:17px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--muted)}
+.h-count.hot{color:var(--accent)}
+
+/* ---------- 本体 ---------- */
+main{padding:4px 10px 16px; max-width:640px; margin:0 auto}
+.stack{display:flex; flex-direction:column; gap:8px}
+.group-h{
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; font-weight:800; color:var(--muted); letter-spacing:.04em;
+  padding:12px 3px 2px;
+}
+.group-h .n{margin-left:auto; font-variant-numeric:tabular-nums}
+.group-h.hot{color:var(--accent)}
+
+/* ---------- リマインダーの行 ---------- */
+.item{
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  min-height:58px; padding:8px 10px;
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  color:var(--fg);
+}
+.item.due{background:var(--accent-bg); border-color:var(--accent-line)}
+.item.snoozed{background:var(--later-bg); border-color:var(--later-line)}
+.item.done{opacity:.72}
+.box{
+  flex:0 0 auto; width:30px; height:30px; border-radius:9px;
+  border:2px solid var(--muted); background:transparent;
+  display:grid; place-items:center; position:relative;
+}
+.item.due .box{border-color:var(--accent)}
+.box svg{width:19px; height:19px; stroke:var(--on-accent); stroke-width:3.6; fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:0}
+.item.done .box{border-color:var(--ok); background:var(--ok)}
+.item.done .box svg{opacity:1; stroke:var(--bg)}
+.body{flex:1; min-width:0; background:none; border:0; padding:0; text-align:left; color:inherit}
+.body .txt{font-size:16px; font-weight:600; line-height:1.3; word-break:break-word}
+.item.done .txt{text-decoration:line-through; opacity:.7}
+.body .when{
+  margin-top:3px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums;
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+}
+.item.due .body .when{color:var(--accent); font-weight:800}
+.item.snoozed .body .when{color:var(--later); font-weight:800}
+.tag{
+  font-size:10px; font-weight:800; padding:2px 5px; border-radius:6px;
+  border:1px solid var(--line); color:var(--muted); line-height:1.4;
+}
+.tag.rep{border-color:var(--line)}
+.laterbtn{
+  flex:0 0 auto; padding:8px 10px; border-radius:9px; font-size:11px; font-weight:800;
+  background:transparent; border:1px solid var(--line); color:var(--muted); line-height:1;
+}
+.laterbtn:active{background:var(--card2)}
+.item.due .laterbtn{border-color:var(--accent-line); color:var(--accent)}
+
+.empty{color:var(--muted); text-align:center; padding:40px 10px; font-size:14px; line-height:1.8}
+.empty .big{font-size:34px; display:block; margin-bottom:8px}
+
+/* ---------- タイマー ---------- */
+.timer{
+  display:flex; align-items:center; gap:10px; width:100%;
+  min-height:62px; padding:9px 10px;
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+}
+.timer.run{background:var(--accent-bg); border-color:var(--accent-line)}
+.timer .tname{flex:1; min-width:0; font-size:16px; font-weight:700; word-break:break-word}
+.timer .tlen{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; margin-top:3px; font-weight:600}
+.timer.run .tlen{color:var(--accent)}
+.timer .rest{
+  flex:0 0 auto; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums;
+  letter-spacing:.02em;
+}
+.timer.run .rest{color:var(--accent)}
+
+/* ---------- ボタン ---------- */
+.btn{
+  min-height:44px; padding:8px 10px; border-radius:11px;
+  background:var(--card2); border:1px solid var(--line); color:var(--fg);
+  font-size:15px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;
+  white-space:nowrap;
+}
+.btn:active{background:var(--press)}
+.btn.primary{background:var(--primary-bg); border-color:var(--accent); color:var(--primary-fg)}
+.btn.danger{background:var(--danger-bg); border-color:var(--danger-line); color:var(--danger)}
+.btn.grow2{flex:1.6}
+.btn.sm{min-height:38px; font-size:13px; padding:7px 11px; border-radius:10px; flex:0 0 auto}
+.btn.on{background:var(--primary-bg); border-color:var(--accent); color:var(--primary-fg)}
+.btn[disabled]{opacity:.4}
+.iconbtn{
+  flex:0 0 auto; width:40px; height:40px; border-radius:10px;
+  background:var(--card2); border:1px solid var(--line); color:var(--fg);
+  font-size:15px; font-weight:800; display:grid; place-items:center;
+}
+.iconbtn:active{background:var(--press)}
+.iconbtn.del{color:var(--danger); border-color:var(--danger-line)}
+
+/* ---------- 下部の操作バー ---------- */
+#bar{
+  position:fixed; left:0; right:0; bottom:0; z-index:30;
+  display:flex; gap:8px; padding:7px 10px calc(7px + env(safe-area-inset-bottom));
+  background:var(--bar-bg); border-top:1px solid var(--line);
+  backdrop-filter:blur(6px);
+}
+#bar .btn{flex:1}
+
+/* ---------- 設定画面 ---------- */
+.sec{background:var(--card); border:1px solid var(--line); border-radius:13px; padding:12px; margin-bottom:10px}
+.sec h2{margin:0 0 3px; font-size:16px; font-weight:700}
+.sec .hint{margin:0 0 10px; font-size:12px; color:var(--muted); line-height:1.55}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.kv{display:flex; justify-content:space-between; gap:12px; font-size:13px; color:var(--muted); padding:5px 0}
+.kv b{color:var(--fg); font-weight:700}
+.row-actions{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap}
+
+/* ---------- 入力シート（追加 / 編集） ---------- */
+#modal{position:fixed; inset:0; z-index:60; display:grid; place-items:end center; padding:0; background:rgba(0,0,0,.6)}
+#modal[hidden]{display:none}
+.sheet{
+  width:100%; max-width:520px; background:var(--card);
+  border:1px solid var(--line); border-bottom:0;
+  border-radius:16px 16px 0 0; padding:14px 14px calc(14px + env(safe-area-inset-bottom));
+  box-shadow:var(--shadow); max-height:92dvh; overflow:auto;
+}
+#modal.mid{place-items:center; padding:16px}
+#modal.mid .sheet{border-radius:14px; border-bottom:1px solid var(--line); max-width:400px}
+.sheet h3{margin:0 0 6px; font-size:17px; font-weight:700}
+.sheet p{margin:0 0 14px; font-size:14px; color:var(--muted); line-height:1.55; white-space:pre-wrap}
+.sheet .acts{display:flex; gap:8px; margin-top:12px}
+.sheet .acts .btn{flex:1}
+.sheet label.lbl{display:block; font-size:12px; font-weight:700; color:var(--muted); margin:12px 0 5px}
+.txt-in{
+  width:100%; padding:12px; font-size:17px; font-weight:600;
+  background:var(--field); color:var(--fg); border:1px solid var(--line); border-radius:11px;
+}
+.txt-in:focus{outline:2px solid var(--accent); outline-offset:-1px}
+.when-in{display:flex; gap:8px}
+.when-in input{
+  flex:1; min-width:0; padding:10px; font-size:15px; font-variant-numeric:tabular-nums;
+  background:var(--field); color:var(--fg); border:1px solid var(--line); border-radius:10px;
+}
+.parsed{
+  margin-top:8px; font-size:13px; font-weight:700; color:var(--accent);
+  font-variant-numeric:tabular-nums; min-height:19px;
+}
+.parsed.none{color:var(--muted); font-weight:600}
+.num-in{
+  width:74px; padding:9px 10px; font-size:15px; font-variant-numeric:tabular-nums; text-align:right;
+  background:var(--field); color:var(--fg); border:1px solid var(--line); border-radius:10px;
+}
+select.sel{
+  padding:9px 10px; font-size:15px;
+  background:var(--field); color:var(--fg); border:1px solid var(--line); border-radius:10px;
+}
+
+/* ---------- アラーム帯（Due の本体） ---------- */
+#alarm{
+  position:fixed; left:8px; right:8px; z-index:65;
+  bottom:calc(var(--bar-h) + 10px + env(safe-area-inset-bottom));
+  background:var(--accent); color:#fff; border-radius:14px; padding:12px;
+  box-shadow:var(--shadow); display:flex; flex-direction:column; gap:9px;
+  max-height:70dvh; overflow:auto;
+}
+#alarm[hidden]{display:none}
+.al-title{font-size:13px; font-weight:800; opacity:.92; display:flex; align-items:center; gap:6px}
+.al-title .n{margin-left:auto; font-variant-numeric:tabular-nums}
+.al-item{border-top:1px solid rgba(255,255,255,.3); padding-top:9px}
+.al-item:first-of-type{border-top:0; padding-top:0}
+.al-txt{font-size:16px; font-weight:800; line-height:1.35; word-break:break-word}
+.al-when{font-size:11px; font-weight:700; opacity:.85; font-variant-numeric:tabular-nums; margin-top:2px}
+.al-acts{display:flex; gap:8px; margin-top:8px}
+.al-acts .btn{
+  flex:1; min-height:40px; font-size:14px;
+  background:rgba(255,255,255,.18); border-color:rgba(255,255,255,.6); color:#fff;
+}
+.al-acts .btn:active{background:rgba(255,255,255,.32)}
+.al-foot{display:flex; gap:8px; border-top:1px solid rgba(255,255,255,.3); padding-top:9px}
+.al-foot .btn{
+  flex:1; min-height:40px; font-size:13px;
+  background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.45); color:#fff;
+}
+
+#toast{
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom:calc(var(--bar-h) + 14px + env(safe-area-inset-bottom)); z-index:70;
+  background:var(--toast-bg); color:var(--toast-fg); font-weight:700; font-size:14px;
+  padding:10px 15px; border-radius:99px; box-shadow:var(--shadow);
+  max-width:88vw; text-align:center; display:none;
+}
+#toast.show{display:block}
+#toast button{background:none;border:0;color:var(--toast-link);font-weight:800;text-decoration:underline;padding:0 0 0 10px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header id="hdr"></header>
+<main id="main"></main>
+<nav id="bar"></nav>
+<div id="modal" hidden></div>
+<div id="alarm" role="alert" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<noscript><p style="padding:20px">このアプリはJavaScriptが必要です。</p></noscript>
+<script>
+(() => {
+'use strict';
+
+/* =========================================================
+   設定値
+   ========================================================= */
+const STORE_KEY  = 'due.v1';
+const KEEP_DAYS  = 60;    // 完了ログの保持日数
+const TICK_MS    = 1000;  // 時計の刻み（タイマー表示と鳴り直しの判定）
+const SNOOZE_CHOICES = [1, 5, 10, 15, 30, 60];   // 自動スヌーズ（しつこさ）の候補・分
+
+/* =========================================================
+   初期データ
+   ========================================================= */
+function defaultData() {
+  return {
+    version: 1,
+    settings: {
+      autoSnooze: 5,             // 何分おきに鳴り直すか
+      quick: [10, 30, 60],       // ワンタップの「あとで」（分）
+      sound: true,
+      soundStyle: 'bell',        // bell / pico
+      keepAwake: true,
+    },
+    reminders: [],
+    timers: [
+      { id: uid(), text: 'カップ麺', sec: 180, endAt: 0, rest: 0 },
+      { id: uid(), text: '休憩', sec: 600, endAt: 0, rest: 0 },
+    ],
+    // 完了ログ（新しいものが先頭）
+    log: [],
+  };
+}
+
+/* =========================================================
+   小道具
+   ========================================================= */
+const $ = (sel, el = document) => el.querySelector(sel);
+const hdr = $('#hdr'), main = $('#main'), bar = $('#bar');
+
+function uid() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
+
+const WD = ['日','月','火','水','木','金','土'];
+function dayKey(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+function startOfDay(d) { const t = new Date(d); t.setHours(0, 0, 0, 0); return t; }
+/* 日付だけの差（今日=0・明日=1） */
+function dayDiff(ts, base = Date.now()) {
+  return Math.round((startOfDay(new Date(ts)) - startOfDay(new Date(base))) / 86400000);
+}
+function hhmm(ts) { const d = new Date(ts); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+/* 「9/5(金) 07:30」「今日 07:30」のような表示 */
+function whenLabel(ts) {
+  const d = new Date(ts), diff = dayDiff(ts);
+  if (diff === 0) return '今日 ' + hhmm(ts);
+  if (diff === 1) return '明日 ' + hhmm(ts);
+  if (diff === -1) return '昨日 ' + hhmm(ts);
+  return `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]}) ${hhmm(ts)}`;
+}
+/* 「3分前」「2時間後」のような相対表示 */
+function agoLabel(ts, now = Date.now()) {
+  const s = Math.round((ts - now) / 1000);
+  const a = Math.abs(s), suf = s < 0 ? '前' : '後';
+  if (a < 60) return a < 5 ? 'たった今' : `${a}秒${suf}`;
+  if (a < 3600) return `${Math.floor(a / 60)}分${suf}`;
+  if (a < 86400) {
+    const h = Math.floor(a / 3600), m = Math.floor((a % 3600) / 60);
+    return m ? `${h}時間${m}分${suf}` : `${h}時間${suf}`;
+  }
+  return `${Math.floor(a / 86400)}日${suf}`;
+}
+/* 秒 → 「12:34」「1:02:03」 */
+function clockLabel(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}:${pad2(m)}:${pad2(s)}` : `${m}:${pad2(s)}`;
+}
+/* 秒 → 「3分」「1時間30分」（タイマーの長さ表示） */
+function lenLabel(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return [h ? h + '時間' : '', m ? m + '分' : '', s ? s + '秒' : ''].join('') || '0秒';
+}
+
+/* =========================================================
+   保存 / 読み込み
+   ========================================================= */
+let state = null;
+
+function isValidData(o) {
+  return !!o && typeof o === 'object' && Array.isArray(o.reminders);
+}
+function normalize(o) {
+  const d = defaultData();
+  const s = Object.assign({}, d.settings, o.settings || {});
+  s.autoSnooze = SNOOZE_CHOICES.includes(Number(s.autoSnooze)) ? Number(s.autoSnooze) : 5;
+  s.quick = Array.isArray(s.quick) && s.quick.length
+    ? s.quick.map(Number).filter(n => n > 0).slice(0, 4)
+    : d.settings.quick;
+  s.sound = s.sound !== false;
+  s.soundStyle = s.soundStyle === 'pico' ? 'pico' : 'bell';
+  s.keepAwake = s.keepAwake !== false;
+
+  const reminders = (o.reminders || []).map(r => ({
+    id: r.id || uid(),
+    text: String(r.text || '').slice(0, 300),
+    due: Number(r.due) || Date.now(),
+    repeat: normRepeat(r.repeat),
+    snoozeUntil: Number(r.snoozeUntil) || 0,
+    lastAlert: Number(r.lastAlert) || 0,
+    createdAt: Number(r.createdAt) || Date.now(),
+  })).filter(r => r.text);
+
+  const timers = (Array.isArray(o.timers) ? o.timers : d.timers).map(t => ({
+    id: t.id || uid(),
+    text: String(t.text || 'タイマー').slice(0, 60),
+    sec: clamp(Number(t.sec) || 60, 1, 24 * 3600),
+    endAt: Number(t.endAt) || 0,       // 動作中：鳴る予定の時刻(epoch ms)。止まっていれば0
+    rest: Number(t.rest) || 0,         // 一時停止中：残り秒
+    lastAlert: Number(t.lastAlert) || 0,
+  }));
+
+  const log = (Array.isArray(o.log) ? o.log : []).map(e => ({
+    id: e.id || uid(),
+    text: String(e.text || ''),
+    due: Number(e.due) || 0,
+    doneAt: Number(e.doneAt) || 0,
+  })).filter(e => e.text && e.doneAt);
+
+  return { version: 1, settings: s, reminders, timers, log };
+}
+function normRepeat(r) {
+  if (!r || typeof r !== 'object') return null;
+  const units = ['minute', 'hour', 'day', 'week', 'month', 'year'];
+  if (!units.includes(r.unit)) return null;
+  const n = clamp(Math.round(Number(r.n) || 1), 1, 999);
+  return { n, unit: r.unit };
+}
+
+function load() {
+  let raw = null;
+  try { raw = localStorage.getItem(STORE_KEY); } catch (e) { /* プライベートモード等 */ }
+  if (!raw) return defaultData();
+  try {
+    const o = JSON.parse(raw);
+    return isValidData(o) ? normalize(o) : defaultData();
+  } catch (e) {
+    console.warn('保存データを読めませんでした', e);
+    return defaultData();
+  }
+}
+
+let saveTimer = null;
+function save(now = false) {
+  const write = () => {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    } catch (e) {
+      toast('保存できませんでした（端末の空き容量を確認してください）');
+      console.error(e);
+    }
+  };
+  if (now) { clearTimeout(saveTimer); write(); return; }
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(write, 250);
+}
+addEventListener('pagehide', () => save(true));
+addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(true); });
+
+/* 古い完了ログを捨てる */
+function pruneLog() {
+  const limit = Date.now() - KEEP_DAYS * 86400000;
+  const before = state.log.length;
+  state.log = state.log.filter(e => e.doneAt >= limit).slice(0, 2000);
+  return before - state.log.length;
+}
+
+/* =========================================================
+   リマインダー（Due の本体）
+
+   1件は次の形。
+     { id, text, due, repeat, snoozeUntil, lastAlert, createdAt }
+   「いつ鳴るか」は snoozeUntil があればそちら、なければ due。
+   時間になっても完了もあとで送りもされなければ、autoSnooze 分おきに鳴り直す。
+   ========================================================= */
+function activeAt(r) { return r.snoozeUntil || r.due; }
+function isDue(r, now = Date.now()) { return activeAt(r) <= now; }
+function autoSnoozeMs() { return state.settings.autoSnooze * 60000; }
+
+/* いま鳴らすべきか（初回、または前に鳴らしてから autoSnooze 分たった） */
+function shouldRing(r, now = Date.now()) {
+  if (!isDue(r, now)) return false;
+  if (!r.lastAlert) return true;
+  return now >= r.lastAlert + autoSnoozeMs();
+}
+function sortedReminders() {
+  return state.reminders.slice().sort((a, b) => activeAt(a) - activeAt(b) || a.createdAt - b.createdAt);
+}
+function findReminder(id) { return state.reminders.find(r => r.id === id) || null; }
+function overdueCount(now = Date.now()) { return state.reminders.filter(r => isDue(r, now)).length; }
+
+function daysInMonth(d) { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
+
+/* 繰り返しの次の1回。now より後になるまで進める */
+function nextDue(ts, rep, now = Date.now()) {
+  const step = (t) => {
+    const d = new Date(t);
+    switch (rep.unit) {
+      case 'minute': d.setMinutes(d.getMinutes() + rep.n); break;
+      case 'hour':   d.setHours(d.getHours() + rep.n); break;
+      case 'day':    d.setDate(d.getDate() + rep.n); break;
+      case 'week':   d.setDate(d.getDate() + 7 * rep.n); break;
+      case 'month': {
+        const day = d.getDate();
+        d.setDate(1);
+        d.setMonth(d.getMonth() + rep.n);
+        d.setDate(Math.min(day, daysInMonth(d)));
+        break;
+      }
+      case 'year':   d.setFullYear(d.getFullYear() + rep.n); break;
+    }
+    return d.getTime();
+  };
+  let t = step(ts), guard = 0;
+  while (t <= now && guard++ < 4000) t = step(t);
+  return t;
+}
+const UNIT_LABEL = { minute: '分', hour: '時間', day: '日', week: '週', month: 'か月', year: '年' };
+function repeatLabel(r) {
+  const rep = r.repeat;
+  if (!rep) return '';
+  if (rep.n === 1) {
+    if (rep.unit === 'day') return '毎日';
+    if (rep.unit === 'week') return '毎週' + WD[new Date(r.due).getDay()] + '曜';
+    if (rep.unit === 'month') return '毎月' + new Date(r.due).getDate() + '日';
+    if (rep.unit === 'year') return '毎年';
+    if (rep.unit === 'hour') return '毎時';
+    if (rep.unit === 'minute') return '毎分';
+  }
+  return `${rep.n}${UNIT_LABEL[rep.unit]}ごと`;
+}
+
+/* 完了。繰り返しなら次の1回へ進めて残す */
+function completeReminder(id) {
+  const r = findReminder(id);
+  if (!r) return null;
+  state.log.unshift({ id: uid(), text: r.text, due: activeAt(r), doneAt: Date.now(), repeat: !!r.repeat });
+  if (r.repeat) {
+    r.due = nextDue(activeAt(r), r.repeat);
+    r.snoozeUntil = 0;
+    r.lastAlert = 0;
+  } else {
+    state.reminders = state.reminders.filter(x => x.id !== id);
+  }
+  pruneLog();
+  save();
+  return r;
+}
+/* あとで（ワンタップのスヌーズ） */
+function snoozeReminder(id, minutes) {
+  const r = findReminder(id);
+  if (!r) return null;
+  r.snoozeUntil = Date.now() + minutes * 60000;
+  r.lastAlert = 0;
+  save();
+  return r;
+}
+/* 完了ログから戻す */
+function restoreLog(logId) {
+  const i = state.log.findIndex(e => e.id === logId);
+  if (i < 0) return null;
+  const e = state.log[i];
+  state.log.splice(i, 1);
+  const r = {
+    id: uid(), text: e.text, due: e.due || Date.now(), repeat: null,
+    snoozeUntil: 0, lastAlert: 0, createdAt: Date.now(),
+  };
+  state.reminders.push(r);
+  save();
+  return r;
+}
+
+/* =========================================================
+   タイマー
+     endAt > 0        … 動作中（endAt に鳴る）
+     rest > 0         … 一時停止中（残り秒）
+     どちらも0        … 止まっている（長さ sec のまま）
+   ========================================================= */
+function findTimer(id) { return state.timers.find(t => t.id === id) || null; }
+function timerRest(t, now = Date.now()) {
+  if (t.endAt) return Math.max(0, (t.endAt - now) / 1000);
+  return t.rest || t.sec;
+}
+function timerRinging(t, now = Date.now()) { return !!t.endAt && now >= t.endAt; }
+function startTimer(t) {
+  t.endAt = Date.now() + Math.round((t.rest || t.sec) * 1000);
+  t.rest = 0;
+  t.lastAlert = 0;
+  save();
+}
+function pauseTimer(t) {
+  t.rest = Math.max(0, (t.endAt - Date.now()) / 1000);
+  t.endAt = 0;
+  save();
+}
+function resetTimer(t) {
+  t.endAt = 0; t.rest = 0; t.lastAlert = 0;
+  save();
+}
+
+/* =========================================================
+   いま鳴っているもの（リマインダーとタイマーをまとめて扱う）
+   ========================================================= */
+function ringingList(now = Date.now()) {
+  const out = [];
+  for (const r of state.reminders) if (isDue(r, now)) out.push({ kind: 'r', id: r.id, text: r.text, at: activeAt(r) });
+  for (const t of state.timers) if (timerRinging(t, now)) out.push({ kind: 't', id: t.id, text: t.text, at: t.endAt });
+  return out.sort((a, b) => a.at - b.at);
+}
+
+/* =========================================================
+   書いたまま入れる（日本語の解釈）
+
+   「明日 7:30 ゴミ出し」「30分後 洗濯物」「毎週月曜 9時 資源ごみ」のように
+   1行書けば、日時と繰り返しを取り出して、残りを用件にする。
+   取り出せなかったときは日時なし（＝下の欄で自分で決める）。
+   ========================================================= */
+const DEFAULT_HOUR = 9;   // 日付だけ書かれたときの時刻
+const WDAY = { 日:0, 月:1, 火:2, 水:3, 木:4, 金:5, 土:6 };
+
+function parseWhen(input, now = Date.now()) {
+  let s = String(input || '');
+  let repeat = null, rel = null, date = null, time = null, wday = null, weekOff = 0, dayShift = null;
+  let hit = false;
+
+  /* 見つけた部分を消す。直後の「に」「までに」などの助詞も一緒に消す */
+  const eat = (re, fn) => {
+    const m = re.exec(s);
+    if (!m) return false;
+    if (fn(m) === false) return false;
+    let rest = s.slice(m.index + m[0].length);
+    rest = rest.replace(/^(?:までには|までに|まで|には|に|の)/, '');
+    s = (s.slice(0, m.index) + ' ' + rest);
+    hit = true;
+    return true;
+  };
+  const num = v => (v == null ? 0 : Number(v));
+
+  /* --- 繰り返し --- */
+  eat(/毎週\s*([日月火水木金土])曜日?/, m => { repeat = { n: 1, unit: 'week' }; wday = WDAY[m[1]]; });
+  eat(/毎月\s*(\d{1,2})\s*日/, m => { repeat = { n: 1, unit: 'month' }; date = { m: null, d: num(m[1]) }; });
+  eat(/(\d{1,3})\s*(分|時間|日|週間|週|か月|ヶ月|ケ月|カ月|年)\s*(?:おき|ごと)/, m => {
+    const u = { '分':'minute', '時間':'hour', '日':'day', '週間':'week', '週':'week',
+                'か月':'month', 'ヶ月':'month', 'ケ月':'month', 'カ月':'month', '年':'year' }[m[2]];
+    repeat = { n: clamp(num(m[1]), 1, 999), unit: u };
+  });
+  eat(/毎(日|週|月|年|時|朝|晩|夜)/, m => {
+    const c = m[1];
+    if (c === '朝')      { repeat = { n: 1, unit: 'day' }; time = time || { h: 7, mi: 0 }; }
+    else if (c === '晩' || c === '夜') { repeat = { n: 1, unit: 'day' }; time = time || { h: 21, mi: 0 }; }
+    else repeat = { n: 1, unit: { '日':'day', '週':'week', '月':'month', '年':'year', '時':'hour' }[c] };
+  });
+
+  /* --- 「30分後」「1時間30分後」「あと10分」 --- */
+  eat(/あと\s*(?:(\d{1,4})\s*時間)?\s*(?:(\d{1,4})\s*分)?/, m => {
+    if (!m[1] && !m[2]) return false;
+    rel = (num(m[1]) * 60 + num(m[2])) * 60000;
+  });
+  eat(/(?:(\d{1,3})\s*週間)?\s*(?:(\d{1,4})\s*日)?\s*(?:(\d{1,4})\s*時間)?\s*(?:(\d{1,4})\s*分)?\s*後/, m => {
+    const w = num(m[1]), d = num(m[2]), h = num(m[3]), mi = num(m[4]);
+    if (!(w || d || h || mi)) return false;
+    rel = ((w * 7 + d) * 1440 + h * 60 + mi) * 60000;
+  });
+
+  /* --- 日付のことば --- */
+  eat(/今夜|今晩/, () => { dayShift = 0; time = time || { h: 20, mi: 0 }; });
+  eat(/明朝|明日の朝/, () => { dayShift = 1; time = time || { h: 7, mi: 0 }; });
+  eat(/明々後日|しあさって/, () => { dayShift = 3; });
+  eat(/明後日|あさって/, () => { dayShift = 2; });
+  eat(/明日|あした|あす|翌日/, () => { dayShift = 1; });
+  eat(/今日|きょう|本日/, () => { dayShift = 0; });
+  eat(/再来週/, () => { weekOff = 14; });
+  eat(/来週/, () => { weekOff = 7; });
+  eat(/来月/, () => { dayShift = 'nextmonth'; });
+
+  /* --- 曜日 --- */
+  eat(/([日月火水木金土])曜日?/, m => { wday = WDAY[m[1]]; });
+
+  /* --- 日付 --- */
+  if (!date) eat(/(\d{1,2})\s*[\/／]\s*(\d{1,2})/, m => { date = { m: num(m[1]), d: num(m[2]) }; });
+  if (!date) eat(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/, m => { date = { m: num(m[1]), d: num(m[2]) }; });
+  if (!date) eat(/(\d{1,2})\s*日/, m => { const d = num(m[1]); if (d < 1 || d > 31) return false; date = { m: null, d }; });
+
+  /* --- 時刻 --- */
+  eat(/正午/, () => { time = { h: 12, mi: 0 }; });
+  if (!time) {
+    eat(/(午前|午後|夜|夕方|朝|昼)?\s*(\d{1,2})\s*[:：]\s*(\d{1,2})/, m => {
+      const h = num(m[2]), mi = num(m[3]);
+      if (h > 23 || mi > 59) return false;
+      time = { h: fixHour(h, m[1]), mi };
+    });
+  }
+  if (!time) {
+    eat(/(午前|午後|夜|夕方|朝|昼)?\s*(\d{1,2})\s*時\s*(半|\d{1,2}\s*分?)?/, m => {
+      const h = num(m[2]);
+      if (h > 23) return false;
+      let mi = 0;
+      if (m[3] === '半') mi = 30;
+      else if (m[3]) mi = num(String(m[3]).replace(/[^\d]/g, ''));
+      if (mi > 59) return false;
+      time = { h: fixHour(h, m[1]), mi };
+    });
+  }
+  function fixHour(h, mark) {
+    if (mark === '午後' || mark === '夜' || mark === '夕方') return h < 12 ? h + 12 : h;
+    if (mark === '午前' || mark === '朝') return h === 12 ? 0 : h;
+    if (mark === '昼') return h < 12 ? h + 12 : h;
+    return h;
+  }
+
+  /* --- 組み立て --- */
+  let due = composeDue({ rel, date, time, wday, weekOff, dayShift }, now);
+  /* 「3時間ごと」のように繰り返しだけ書かれたら、1回目はこちらで決める */
+  if (due == null && repeat) due = firstDueForRepeat(repeat, now);
+
+  /* 残りを用件に */
+  const text = s.replace(/\s+/g, ' ').replace(/^[\s、,]+|[\s、,]+$/g, '').trim();
+  return { due, repeat, text, matched: hit && due != null };
+}
+
+/* 繰り返しだけ指定されたときの1回目。分・時間はその間隔のあと、日以上は次の朝 */
+function firstDueForRepeat(rep, now) {
+  if (rep.unit === 'minute') return now + rep.n * 60000;
+  if (rep.unit === 'hour') return now + rep.n * 3600000;
+  const d = startOfDay(new Date(now));
+  d.setHours(DEFAULT_HOUR, 0, 0, 0);
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
+function composeDue(p, now) {
+  if (p.rel != null) return now + p.rel;
+
+  const base = new Date(now);
+  let day = null;                       // 日付部分（0時0分の Date）
+  const explicitTime = !!p.time;
+  const t = p.time || { h: DEFAULT_HOUR, mi: 0 };
+  const set = d => { const x = new Date(d); x.setHours(t.h, t.mi, 0, 0); return x.getTime(); };
+
+  if (p.date) {
+    const y = base.getFullYear();
+    const mo = p.date.m == null ? base.getMonth() + 1 : p.date.m;
+    day = new Date(y, mo - 1, p.date.d);
+    if (day.getMonth() !== mo - 1) return null;          // 2/30 のような日付
+    if (p.date.m == null && set(day) <= now) {           // 「20日」で今月分が過ぎていたら来月
+      day = new Date(y, mo, p.date.d);
+    } else if (p.date.m != null && set(day) <= now - 86400000) {
+      day = new Date(y + 1, mo - 1, p.date.d);           // 年をまたぐ指定
+    }
+  } else if (p.wday != null) {
+    day = startOfDay(base);
+    day.setDate(day.getDate() + p.weekOff);
+    let delta = (p.wday - day.getDay() + 7) % 7;
+    day.setDate(day.getDate() + delta);
+    if (set(day) <= now) day.setDate(day.getDate() + 7);
+  } else if (p.dayShift === 'nextmonth') {
+    day = startOfDay(base);
+    day.setMonth(day.getMonth() + 1);
+  } else if (p.dayShift != null) {
+    day = startOfDay(base);
+    day.setDate(day.getDate() + p.dayShift);
+  } else if (p.weekOff) {
+    day = startOfDay(base);
+    day.setDate(day.getDate() + p.weekOff);
+  }
+
+  if (!day && !explicitTime) return null;
+
+  /* 時刻だけ書かれたとき。その時刻が過ぎていれば翌日 */
+  if (!day) {
+    day = startOfDay(base);
+    let out = set(day);
+    if (out <= now) { const d2 = new Date(day); d2.setDate(d2.getDate() + 1); out = set(d2); }
+    return out;
+  }
+  /* 日付だけ書かれていて、その時刻が過ぎているときは、次のきりのいい時刻に送る */
+  let out = set(day);
+  if (out <= now && !explicitTime) {
+    const nx = new Date(now);
+    nx.setHours(nx.getHours() + 1, 0, 0, 0);
+    return nx.getTime();
+  }
+  return out;
+}
+
+/* =========================================================
+   トースト / 確認ダイアログ
+   ========================================================= */
+let toastTimer = null;
+function toast(msg, ms = 2600) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+/* 取り消せる操作のトースト（完了の直後など） */
+function toastUndo(msg, undo, ms = 5000) {
+  const el = $('#toast');
+  el.innerHTML = esc(msg) + '<button type="button" id="doUndo">取り消す</button>';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+  $('#doUndo').onclick = () => { el.classList.remove('show'); undo(); };
+}
+
+function confirmDialog({ title, body = '', ok = 'OK', cancel = 'やめる', danger = false }) {
+  return new Promise(resolve => {
+    const m = $('#modal');
+    m.className = 'mid';
+    m.innerHTML = `
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <h3>${esc(title)}</h3>
+        ${body ? `<p>${esc(body)}</p>` : ''}
+        <div class="acts">
+          <button class="btn" data-a="cancel">${esc(cancel)}</button>
+          <button class="btn ${danger ? 'danger' : 'primary'}" data-a="ok">${esc(ok)}</button>
+        </div>
+      </div>`;
+    m.hidden = false;
+    const done = v => { closeModal(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = e => { if (e.key === 'Escape') done(false); };
+    document.addEventListener('keydown', onKey);
+    m.onclick = e => {
+      const b = e.target.closest('[data-a]');
+      if (b) return done(b.dataset.a === 'ok');
+      if (e.target === m) done(false);
+    };
+    setTimeout(() => { const b = m.querySelector('[data-a="ok"]'); if (b) b.focus(); }, 0);
+  });
+}
+function closeModal() {
+  const m = $('#modal');
+  m.hidden = true; m.className = ''; m.innerHTML = ''; m.onclick = null;
+}
+
+/* =========================================================
+   効果音
+   音声ファイルは持たず、その場で合成する（オフラインでも鳴る）
+   ========================================================= */
+let audioCtx = null;
+let reverbIR = null;
+
+/* 画面に一度も触れていない状態での振動はブラウザに拒否される。
+   iOS の Safari は navigator.vibrate に対応していないので、その場合は何もしない */
+function buzz(pattern) {
+  try {
+    if (!navigator.vibrate) return;
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    navigator.vibrate(pattern);
+  } catch (e) { /* 無視 */ }
+}
+
+function ensureAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') { const r = audioCtx.resume(); if (r && r.catch) r.catch(() => {}); }
+  return audioCtx;
+}
+
+/* 金属的な余韻を作るための短い残響（1回だけ生成して使い回す） */
+function getReverb(ac) {
+  if (reverbIR) return reverbIR;
+  const len = Math.floor(ac.sampleRate * 1.1);
+  const buf = ac.createBuffer(2, len, ac.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+  }
+  const conv = ac.createConvolver();
+  conv.buffer = buf;
+  reverbIR = conv;
+  return conv;
+}
+
+/* ベルの音色（基音＋わずかにずらした倍音。上の倍音ほど速く減衰する） */
+function bell(ac, out, freq, start, dur, peak) {
+  const PARTIALS = [[1, 1], [2.01, 0.42], [3.01, 0.22], [4.07, 0.11], [5.43, 0.06]];
+  const t0 = ac.currentTime + start;
+  PARTIALS.forEach(([mul, amp], i) => {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq * mul, t0);
+    const life = dur * Math.pow(0.62, i);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak * amp, t0 + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + life);
+    osc.connect(g); g.connect(out);
+    osc.start(t0);
+    osc.stop(t0 + life + 0.03);
+  });
+}
+
+/* notes: [周波数, 開始秒, 長さ秒, 音量] の配列を鳴らす。wet は残響の量 */
+function playBells(notes, volume, wetAmount = 0.32) {
+  const ac = ensureAudio();
+  if (!ac) return;
+  try {
+    const master = ac.createGain();
+    master.gain.value = volume;
+    master.connect(ac.destination);
+    const wet = ac.createGain();
+    wet.gain.value = wetAmount;
+    wet.connect(master);
+    getReverb(ac).connect(wet);
+    const dry = ac.createGain();
+    dry.gain.value = 1;
+    dry.connect(master);
+    const bus = ac.createGain();
+    bus.connect(dry);
+    bus.connect(getReverb(ac));
+    for (const [f, t, d, p] of notes) bell(ac, bus, f, t, d, p);
+  } catch (e) { /* 音が出せない環境は黙って無視 */ }
+}
+
+const SOUNDS = {
+  // 完了：明るく上がっていく2音＋余韻
+  bell:  [[1318.51, 0,     0.75, 0.5],   // E6
+          [1975.53, 0.085, 1.05, 0.6]],  // B6
+  // 完了（素朴な「ピコン」）
+  pico:  [[1046.50, 0,     0.16, 0.55],
+          [1567.98, 0.052, 0.34, 0.6]],
+  // 追加：低めの短い1音
+  add:   [[659.25,  0,     0.18, 0.4],   // E5
+          [987.77,  0.05,  0.30, 0.4]],  // B5
+  // あとで：下がる2音
+  later: [[880.00,  0,     0.16, 0.42],  // A5
+          [587.33,  0.048, 0.26, 0.46]], // D5
+  // 削除・取り消し：低い1音
+  drop:  [[392.00,  0,     0.22, 0.42]], // G4
+};
+
+function playSound(name) {
+  if (!state.settings.sound) return;
+  if (name === 'done') return playBells(SOUNDS[state.settings.soundStyle] || SOUNDS.bell, 0.18);
+  playBells(SOUNDS[name] || SOUNDS.add, 0.13, 0.14);
+}
+
+/* アラーム：ほかの音とはっきり違う、鳴り続ける感じの音。設定のオン/オフとは無関係に鳴らす
+   （鳴らないアラームには意味がないため。音そのものを止めたいときは端末を消音にする） */
+function playAlarm() {
+  const ring = (t) => ([
+    [1174.66, t,        0.42, 0.55],   // D6
+    [1567.98, t + 0.10, 0.42, 0.55],   // G6
+    [1174.66, t + 0.20, 0.42, 0.5],
+    [1567.98, t + 0.30, 0.9,  0.6],
+  ]);
+  playBells([...ring(0), ...ring(0.62), ...ring(1.24)], 0.24, 0.28);
+}
+
+/* =========================================================
+   アラーム（時間になったら知らせる → 片づけるまで鳴り直す）
+   ========================================================= */
+let alarmHidden = false;   // 「閉じる」を押した状態。次に鳴り直すまで出さない
+let alarmSig = '';
+
+function alarmSignature(list) { return list.map(e => e.kind + e.id).join('|'); }
+
+function renderAlarm(list, fired) {
+  const el = $('#alarm');
+  const sig = alarmSignature(list);
+  if (sig !== alarmSig) { alarmHidden = false; alarmSig = sig; }
+  if (fired) alarmHidden = false;
+
+  if (!list.length || alarmHidden) {
+    if (!el.hidden) { el.hidden = true; el.innerHTML = ''; }
+    return;
+  }
+  const q = state.settings.quick;
+  const html = list.slice(0, 6).map(e => `
+    <div class="al-item">
+      <div class="al-txt">${esc(e.text)}</div>
+      <div class="al-when">${e.kind === 't' ? 'タイマー' : esc(whenLabel(e.at))}　${esc(agoLabel(e.at))}</div>
+      <div class="al-acts">
+        <button class="btn" data-act="al-done" data-kind="${e.kind}" data-id="${esc(e.id)}">✓ 完了</button>
+        ${e.kind === 'r'
+          ? q.slice(0, 2).map(n => `<button class="btn" data-act="al-snooze" data-id="${esc(e.id)}" data-min="${n}">+${n}分</button>`).join('')
+          : `<button class="btn" data-act="al-again" data-id="${esc(e.id)}">もう一度</button>`}
+      </div>
+    </div>`).join('');
+  const more = list.length > 6 ? `<div class="al-when">ほか ${list.length - 6}件</div>` : '';
+  const body = `
+    <div class="al-title">⏰ 時間です<span class="n">${list.length}件</span></div>
+    ${html}${more}
+    <div class="al-foot">
+      <button class="btn" data-act="al-hide">閉じる</button>
+      <button class="btn" data-act="al-snooze-all" data-min="${state.settings.quick[0]}">全部 +${state.settings.quick[0]}分</button>
+    </div>`;
+  if (el.innerHTML !== body) el.innerHTML = body;
+  el.hidden = false;
+}
+
+/* 端末の通知（許可されているときだけ）。
+   ホーム画面に追加した iPhone では、アプリを開いている間だけ確実に出る */
+function notifyOS(list) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const title = '⏰ ' + list[0].text;
+  const body = list.length > 1 ? `ほか ${list.length - 1}件` : whenLabel(list[0].at);
+  const opts = {
+    body, tag: 'due-alarm', renotify: true,
+    icon: './icons/icon-192.png', badge: './icons/icon-192.png',
+  };
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+      navigator.serviceWorker.ready.then(reg => reg.showNotification(title, opts)).catch(() => {});
+    } else {
+      new Notification(title, opts);
+    }
+  } catch (e) { /* 通知が使えない環境は無視 */ }
+}
+
+async function askNotifyPermission() {
+  if (!('Notification' in window)) {
+    toast('この端末は通知に対応していません（ホーム画面に追加すると使えることがあります）', 4200);
+    return;
+  }
+  if (Notification.permission === 'granted') { toast('通知はすでに許可されています'); return; }
+  if (Notification.permission === 'denied') { toast('端末の設定で通知がブロックされています', 4200); return; }
+  const r = await Notification.requestPermission();
+  toast(r === 'granted' ? '通知を許可しました' : '通知は許可されませんでした');
+  rerender();
+}
+
+/* アプリのアイコンに未処理の件数を出す（iOS はホーム画面に追加したときだけ） */
+function updateBadge(n) {
+  try {
+    if (!navigator.setAppBadge) return;
+    if (n > 0) navigator.setAppBadge(n); else navigator.clearAppBadge();
+  } catch (e) { /* 非対応。無視 */ }
+}
+
+/* =========================================================
+   1秒ごとの時計
+   ========================================================= */
+let lastListSig = '';
+
+function listSignature(now) {
+  const due = state.reminders.filter(r => isDue(r, now)).map(r => r.id).join(',');
+  const run = state.timers.filter(t => t.endAt).map(t => t.id + (timerRinging(t, now) ? '!' : '')).join(',');
+  return due + '/' + run + '/' + Math.floor(now / 60000);
+}
+
+function tick() {
+  const now = Date.now();
+  const fire = [];
+
+  for (const r of state.reminders) {
+    if (!shouldRing(r, now)) continue;
+    r.lastAlert = now;
+    fire.push({ kind: 'r', id: r.id, text: r.text, at: activeAt(r) });
+  }
+  for (const t of state.timers) {
+    if (!timerRinging(t, now)) continue;
+    if (t.lastAlert && now < t.lastAlert + autoSnoozeMs()) continue;
+    t.lastAlert = now;
+    fire.push({ kind: 't', id: t.id, text: t.text, at: t.endAt });
+  }
+  if (fire.length) {
+    save(true);
+    playAlarm();
+    buzz([220, 120, 220, 120, 220]);
+    notifyOS(fire);
+  }
+
+  renderAlarm(ringingList(now), fire.length > 0);
+
+  /* 動いているタイマーの数字だけ、作り直さずに書き換える */
+  for (const el of document.querySelectorAll('[data-clock]')) {
+    const t = findTimer(el.dataset.clock);
+    if (t) el.textContent = clockLabel(timerRest(t, now));
+  }
+
+  const sig = listSignature(now);
+  if (sig !== lastListSig) {
+    lastListSig = sig;
+    if (!$('#modal').hidden) return;   // 入力中は作り直さない
+    rerender();
+  }
+}
+
+/* =========================================================
+   画面スリープ防止（Wake Lock API）
+   ========================================================= */
+let wakeLock = null;
+async function acquireWakeLock() {
+  if (!state.settings.keepAwake) return;
+  if (!('wakeLock' in navigator)) return;
+  if (wakeLock) return;
+  if (document.visibilityState !== 'visible') return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) { /* 電池セーバー中などは失敗する。無視して良い */ }
+}
+async function releaseWakeLock() {
+  try { if (wakeLock) await wakeLock.release(); } catch (e) {}
+  wakeLock = null;
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  /* 閉じている間に来た分をすぐ知らせる */
+  tick();
+  rerender();
+  acquireWakeLock();
+});
+
+/* =========================================================
+   画面遷移（ハッシュ = 端末の「戻る」が効く）
+   ========================================================= */
+function route() {
+  const h = location.hash || '#/';
+  if (h === '#/timers') return { view: 'timers' };
+  if (h === '#/log') return { view: 'log' };
+  if (h === '#/settings') return { view: 'settings' };
+  return { view: 'home' };
+}
+const go = h => { location.hash = h; };
+addEventListener('hashchange', () => render());
+
+/* =========================================================
+   描画
+   ========================================================= */
+const CHECK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="4.5,12.5 10,18 19.5,6.5"/></svg>';
+
+/* iPhone では「ホーム画面に追加」しないと、通知もバッジも使えない */
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_STANDALONE = navigator.standalone === true
+  || (matchMedia && matchMedia('(display-mode: standalone)').matches);
+
+function render(resetScroll = true) {
+  const r = route();
+  if (r.view === 'timers') renderTimers();
+  else if (r.view === 'log') renderLog();
+  else if (r.view === 'settings') renderSettings();
+  else renderHome();
+  renderAlarm(ringingList(), false);
+  updateBadge(overdueCount());
+  lastListSig = listSignature(Date.now());
+  if (resetScroll) document.documentElement.scrollTop = 0;
+}
+/* スクロール位置を保ったまま今の画面を作り直す */
+function rerender() {
+  const y = window.scrollY;
+  render(false);
+  window.scrollTo(0, y);
+}
+
+function headerHTML(title, sub, count, hot) {
+  return `
+    <div class="h-row">
+      <h1 class="h-title">${title}</h1>
+      ${count != null ? `<div class="h-count ${hot ? 'hot' : ''}">${esc(String(count))}</div>` : ''}
+    </div>
+    <div class="h-sub">${sub}</div>`;
+}
+
+/* ---------- 一覧 ---------- */
+function renderHome() {
+  const now = Date.now();
+  const all = sortedReminders();
+  const due = [], today = [], tomorrow = [], later = [];
+  for (const r of all) {
+    const at = activeAt(r);
+    if (at <= now) due.push(r);
+    else if (dayDiff(at, now) === 0) today.push(r);
+    else if (dayDiff(at, now) === 1) tomorrow.push(r);
+    else later.push(r);
+  }
+  const next = all.find(r => activeAt(r) > now);
+  const sub = all.length
+    ? (due.length ? `${due.length}件が時間を過ぎています` : (next ? `次は ${whenLabel(activeAt(next))}（${agoLabel(activeAt(next), now)}）` : ''))
+    : '書いて、時間を決めるだけ';
+  hdr.innerHTML = headerHTML('Due<span class="dot">.</span>', esc(sub), all.length ? `${due.length}/${all.length}` : null, due.length > 0);
+
+  const sec = (label, arr, hot) => arr.length
+    ? `<div class="group-h ${hot ? 'hot' : ''}">${label}<span class="n">${arr.length}</span></div>
+       <div class="stack">${arr.map(itemHTML).join('')}</div>`
+    : '';
+
+  main.innerHTML = all.length ? `
+    ${sec('⏰ 時間です', due, true)}
+    ${sec('今日', today)}
+    ${sec('明日', tomorrow)}
+    ${sec('これから', later)}
+  ` : `<div class="empty"><span class="big">⏰</span>
+      リマインダーはありません。<br>下の「＋ 追加」から。<br><br>
+      <b>「明日 7:30 ゴミ出し」</b>のように1行書けば、<br>時間と繰り返しはこちらで読み取ります。
+      ${IS_IOS && !IS_STANDALONE ? '<br><br>共有ボタン → 「ホーム画面に追加」で<br>アプリとして使えます。' : ''}</div>`;
+
+  bar.innerHTML = `
+    <button class="btn primary grow2" data-act="add">＋ 追加</button>
+    <button class="btn" data-act="nav" data-to="#/timers">タイマー</button>
+    <button class="btn" data-act="nav" data-to="#/log">ログ</button>
+    <button class="btn" data-act="nav" data-to="#/settings">設定</button>`;
+}
+
+function itemHTML(r) {
+  const now = Date.now();
+  const at = activeAt(r);
+  const due = at <= now;
+  const cls = due ? 'due' : (r.snoozeUntil ? 'snoozed' : '');
+  const rep = repeatLabel(r);
+  return `
+    <div class="item ${cls}" data-id="${esc(r.id)}">
+      <button class="box" data-act="done" data-id="${esc(r.id)}" aria-label="完了にする">${CHECK_SVG}</button>
+      <button class="body" data-act="edit" data-id="${esc(r.id)}">
+        <div class="txt">${esc(r.text)}</div>
+        <div class="when">
+          <span>${esc(whenLabel(at))}</span>
+          <span>${esc(agoLabel(at, now))}</span>
+          ${r.snoozeUntil ? '<span class="tag">あとで</span>' : ''}
+          ${rep ? `<span class="tag rep">${esc(rep)}</span>` : ''}
+        </div>
+      </button>
+      <button class="laterbtn" data-act="later" data-id="${esc(r.id)}">あとで</button>
+    </div>`;
+}
+
+/* ---------- タイマー ---------- */
+function renderTimers() {
+  const now = Date.now();
+  const running = state.timers.filter(t => t.endAt).length;
+  hdr.innerHTML = headerHTML('タイマー', running ? `${running}件 動いています` : '押すと始まります。長さは名前を押して変更',
+    state.timers.length, running > 0);
+
+  main.innerHTML = state.timers.length
+    ? `<div class="stack">${state.timers.map(t => timerHTML(t, now)).join('')}</div>`
+    : `<div class="empty"><span class="big">⏳</span>タイマーがありません。<br>下の「＋ 追加」から。</div>`;
+
+  bar.innerHTML = `
+    <button class="btn" data-act="nav" data-to="#/">← 一覧</button>
+    <button class="btn primary grow2" data-act="tadd">＋ 追加</button>`;
+}
+function timerHTML(t, now) {
+  const ring = timerRinging(t, now);
+  const run = !!t.endAt && !ring;
+  const cls = ring ? 'run' : (run ? 'run' : '');
+  const st = ring ? '鳴っています' : (run ? '動作中' : (t.rest ? `一時停止 ${lenLabel(Math.round(t.rest))}` : lenLabel(t.sec)));
+  return `
+    <div class="timer ${cls}" data-id="${esc(t.id)}">
+      <button class="body" data-act="tedit" data-id="${esc(t.id)}">
+        <div class="tname">${esc(t.text)}</div>
+        <div class="tlen">${esc(st)}</div>
+      </button>
+      <div class="rest" data-clock="${esc(t.id)}">${clockLabel(timerRest(t, now))}</div>
+      <button class="iconbtn" data-act="${t.endAt ? 'tpause' : 'tstart'}" data-id="${esc(t.id)}"
+        aria-label="${t.endAt ? '一時停止' : '開始'}">${t.endAt ? '⏸' : '▶'}</button>
+      <button class="iconbtn" data-act="treset" data-id="${esc(t.id)}" aria-label="リセット">↺</button>
+    </div>`;
+}
+
+/* ---------- 完了ログ ---------- */
+function renderLog() {
+  hdr.innerHTML = headerHTML('ログ', `完了したもの（${KEEP_DAYS}日分）`, state.log.length, false);
+
+  if (!state.log.length) {
+    main.innerHTML = `<div class="empty"><span class="big">🗂</span>まだ何もありません。</div>`;
+  } else {
+    const byDay = new Map();
+    for (const e of state.log) {
+      const k = dayKey(new Date(e.doneAt));
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(e);
+    }
+    main.innerHTML = [...byDay.entries()].map(([k, arr]) => {
+      const d = new Date(arr[0].doneAt);
+      const diff = dayDiff(arr[0].doneAt);
+      const label = diff === 0 ? '今日' : diff === -1 ? '昨日' : `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`;
+      return `<div class="group-h">${label}<span class="n">${arr.length}</span></div>
+        <div class="stack">${arr.map(e => `
+          <div class="item done">
+            <div class="box">${CHECK_SVG}</div>
+            <div class="body">
+              <div class="txt">${esc(e.text)}</div>
+              <div class="when"><span>${esc(hhmm(e.doneAt))} 完了</span>${e.repeat ? '<span class="tag rep">繰り返し</span>' : ''}</div>
+            </div>
+            <button class="laterbtn" data-act="restore" data-id="${esc(e.id)}">戻す</button>
+          </div>`).join('')}</div>`;
+    }).join('');
+  }
+  bar.innerHTML = `
+    <button class="btn" data-act="nav" data-to="#/">← 一覧</button>
+    <button class="btn" data-act="clearlog" ${state.log.length ? '' : 'disabled'}>ログを空にする</button>`;
+}
+
+/* ---------- 設定 ---------- */
+function renderSettings() {
+  const s = state.settings;
+  const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+  const permLabel = { granted: '許可されています', denied: 'ブロックされています', default: 'まだ聞いていません', unsupported: '非対応' }[perm];
+
+  hdr.innerHTML = headerHTML('設定', 'このアプリはこの端末の中だけで動きます', null, false);
+
+  main.innerHTML = `
+    <div class="sec">
+      <h2>しつこさ</h2>
+      <p class="hint">時間になっても完了にも「あとで」にもしなかったとき、この間隔で鳴り直します。
+        Due のいちばん大事なところです。</p>
+      <div class="chips">
+        ${SNOOZE_CHOICES.map(n => `<button class="btn sm ${s.autoSnooze === n ? 'on' : ''}" data-act="autosnooze" data-min="${n}">${n}分おき</button>`).join('')}
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>ワンタップの「あとで」</h2>
+      <p class="hint">行の「あとで」とアラームに出るボタンです（分）。</p>
+      <div class="chips">
+        ${s.quick.map((n, i) => `<input class="num-in" type="number" min="1" max="1440" step="1" value="${n}" data-quick="${i}" aria-label="あとで ${i + 1}つめ">`).join('')}
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>音</h2>
+      <p class="hint">音声ファイルは持たず、その場で作っています。オフラインでも鳴ります。
+        アラームの音は、この設定に関係なく鳴ります。</p>
+      <div class="chips">
+        <button class="btn sm ${s.sound ? 'on' : ''}" data-act="sound">${s.sound ? '鳴らす' : '鳴らさない'}</button>
+        <button class="btn sm ${s.soundStyle === 'bell' ? 'on' : ''}" data-act="style" data-style="bell">ベル</button>
+        <button class="btn sm ${s.soundStyle === 'pico' ? 'on' : ''}" data-act="style" data-style="pico">ピコン</button>
+        <button class="btn sm" data-act="testalarm">アラームを試す</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>通知とスリープ</h2>
+      <p class="hint">アプリを閉じている間の通知は、この作りでは保証できません（下の「できないこと」）。
+        画面を消さない設定にしておくと、開いたままのときは確実に鳴ります。</p>
+      <div class="kv"><span>端末の通知</span><b>${permLabel}</b></div>
+      <div class="row-actions">
+        <button class="btn sm" data-act="notifyperm">通知を許可する</button>
+        <button class="btn sm ${s.keepAwake ? 'on' : ''}" data-act="keepawake">${s.keepAwake ? '画面を消さない' : '通常どおり消す'}</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>書き方</h2>
+      <p class="hint">追加のときに1行書けば、日時と繰り返しを読み取ります。</p>
+      <div class="kv"><span>明日 7:30 ゴミ出し</span><b>明日 7:30</b></div>
+      <div class="kv"><span>30分後 洗濯物</span><b>30分後</b></div>
+      <div class="kv"><span>毎週月曜 9時 資源ごみ</span><b>毎週月曜 9:00</b></div>
+      <div class="kv"><span>毎月25日 家賃</span><b>毎月25日 9:00</b></div>
+      <div class="kv"><span>9/20 14時 歯医者</span><b>9/20 14:00</b></div>
+      <div class="kv"><span>3時間ごと 水を飲む</span><b>3時間ごと</b></div>
+      <p class="hint" style="margin:10px 0 0">時刻だけ書いて、その時刻が過ぎているときは、
+        まず同じ時刻の午後、それも過ぎていれば翌日に回します。</p>
+    </div>
+
+    <div class="sec">
+      <h2>バックアップ</h2>
+      <p class="hint">保存先はこの端末の中（localStorage）だけです。
+        機種変更やデータ削除の前に書き出してください。</p>
+      <div class="kv"><span>リマインダー</span><b>${state.reminders.length}件</b></div>
+      <div class="kv"><span>タイマー</span><b>${state.timers.length}件</b></div>
+      <div class="kv"><span>完了ログ</span><b>${state.log.length}件</b></div>
+      <div class="row-actions">
+        <button class="btn sm" data-act="export">書き出す</button>
+        <button class="btn sm" data-act="import">読み込む</button>
+      </div>
+    </div>
+
+    ${IS_STANDALONE ? '' : `<div class="sec">
+      <h2>ホーム画面に追加</h2>
+      <p class="hint">${IS_IOS
+        ? 'Safari の共有ボタン（□に↑）→「ホーム画面に追加」。追加したアイコンから開くと、アドレスバーのない全画面になり、通知とアイコンのバッジも使えます。'
+        : 'ブラウザのメニューから「ホーム画面に追加」／「アプリをインストール」を選ぶと、全画面で使えます。'}</p>
+    </div>`}
+
+    <div class="sec">
+      <h2>できないこと</h2>
+      <p class="hint">サーバーを持たない作りなので、<b>アプリを閉じている間に鳴らすことはできません</b>。
+        閉じていた分は、次に開いたときにまとめて鳴ります。
+        絶対に外せない用事は、端末の標準アラームと併用してください。</p>
+    </div>
+
+    <div class="sec">
+      <h2>全部消す</h2>
+      <p class="hint">リマインダー・タイマー・ログをすべて消して初期状態に戻します。</p>
+      <div class="row-actions"><button class="btn sm danger" data-act="wipe">全データを消去</button></div>
+    </div>`;
+
+  bar.innerHTML = `<button class="btn" data-act="nav" data-to="#/">← 一覧</button>`;
+}
+
+/* =========================================================
+   入力シート（追加 / 編集）
+   ========================================================= */
+let editing = null;      // 編集中のリマインダーID（新規なら null）
+let manualWhen = false;  // 日時を手で触ったか（触ったら文章からの上書きをやめる）
+
+function roundedSoon(now = Date.now()) {
+  const d = new Date(now + 3600000);
+  d.setMinutes(d.getMinutes() < 30 ? 0 : 30, 0, 0);
+  return d.getTime();
+}
+function dateValue(ts) { const d = new Date(ts); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function timeValue(ts) { return hhmm(ts); }
+function readWhen() {
+  const dv = $('#eDate').value, tv = $('#eTime').value;
+  if (!dv || !tv) return null;
+  const [y, m, d] = dv.split('-').map(Number);
+  const [h, mi] = tv.split(':').map(Number);
+  const out = new Date(y, m - 1, d, h, mi, 0, 0).getTime();
+  return Number.isFinite(out) ? out : null;
+}
+function writeWhen(ts) {
+  $('#eDate').value = dateValue(ts);
+  $('#eTime').value = timeValue(ts);
+}
+function readRepeat() {
+  const u = $('#eRepUnit').value;
+  if (u === 'none') return null;
+  return { n: clamp(Math.round(Number($('#eRepN').value) || 1), 1, 999), unit: u };
+}
+function writeRepeat(rep) {
+  $('#eRepUnit').value = rep ? rep.unit : 'none';
+  $('#eRepN').value = rep ? rep.n : 1;
+}
+
+function openEditor(id) {
+  const r = id ? findReminder(id) : null;
+  editing = r ? r.id : null;
+  manualWhen = !!r;
+  const when = r ? activeAt(r) : roundedSoon();
+  const m = $('#modal');
+  m.className = '';
+  m.innerHTML = `
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="${r ? 'リマインダーを編集' : 'リマインダーを追加'}">
+      <h3>${r ? 'リマインダー' : '新しいリマインダー'}</h3>
+      <input class="txt-in" id="eText" type="text" enterkeyhint="done" autocomplete="off"
+        placeholder="明日 7:30 ゴミ出し" value="${esc(r ? r.text : '')}">
+      <div class="parsed none" id="eParsed">「明日 7:30」「30分後」「毎週月曜 9時」などが使えます</div>
+      <div class="chips" style="margin-top:10px">
+        <button class="btn sm" data-act="q" data-min="15">15分後</button>
+        <button class="btn sm" data-act="q" data-min="60">1時間後</button>
+        <button class="btn sm" data-act="q" data-min="180">3時間後</button>
+        <button class="btn sm" data-act="q" data-at="tonight">今夜 20:00</button>
+        <button class="btn sm" data-act="q" data-at="tomorrow">明日 9:00</button>
+      </div>
+      <label class="lbl">いつ</label>
+      <div class="when-in">
+        <input type="date" id="eDate" value="${dateValue(when)}">
+        <input type="time" id="eTime" value="${timeValue(when)}">
+      </div>
+      <label class="lbl">繰り返し</label>
+      <div class="chips">
+        <input class="num-in" type="number" id="eRepN" min="1" max="999" value="${r && r.repeat ? r.repeat.n : 1}">
+        <select class="sel" id="eRepUnit">
+          <option value="none">しない</option>
+          <option value="minute">分ごと</option>
+          <option value="hour">時間ごと</option>
+          <option value="day">日ごと</option>
+          <option value="week">週ごと</option>
+          <option value="month">か月ごと</option>
+          <option value="year">年ごと</option>
+        </select>
+      </div>
+      <div class="acts">
+        ${r ? '<button class="btn danger" data-act="edel">削除</button>'
+            : '<button class="btn" data-act="ecancel">やめる</button>'}
+        <button class="btn primary" data-act="esave">${r ? '保存' : '追加'}</button>
+      </div>
+    </div>`;
+  m.hidden = false;
+  writeRepeat(r ? r.repeat : null);
+  m.onclick = e => { if (e.target === m) closeModal(); };
+
+  const ti = $('#eText');
+  ti.addEventListener('input', onEditorInput);
+  ti.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveEditor(); } });
+  for (const el of m.querySelectorAll('#eDate,#eTime')) {
+    el.addEventListener('input', () => { manualWhen = true; showParsed(); });
+  }
+  $('#eRepUnit').addEventListener('change', showParsed);
+  $('#eRepN').addEventListener('input', showParsed);
+  setTimeout(() => { ti.focus(); if (!r) ti.setSelectionRange(ti.value.length, ti.value.length); }, 30);
+  showParsed();
+}
+
+/* 書いている途中から、日時と繰り返しを読み取って下の欄に入れる */
+function onEditorInput() {
+  const raw = $('#eText').value;
+  const p = parseWhen(raw);
+  if (p.matched && !manualWhen) {
+    writeWhen(p.due);
+    if (p.repeat) writeRepeat(p.repeat);
+  }
+  showParsed(p);
+}
+function showParsed(p) {
+  const el = $('#eParsed');
+  if (!el) return;
+  if (p === undefined) p = parseWhen($('#eText').value);
+  const when = readWhen();
+  const rep = readRepeat();
+  if (!when) {
+    el.className = 'parsed none';
+    el.textContent = '日付と時刻を決めてください';
+    return;
+  }
+  const body = p.matched ? p.text : $('#eText').value.trim();
+  el.className = 'parsed';
+  el.textContent = `${whenLabel(when)}（${agoLabel(when)}）`
+    + (rep ? ' ・ ' + repeatLabel({ due: when, repeat: rep }) : '')
+    + (body ? ' → ' + body : '');
+}
+
+function saveEditor() {
+  const raw = $('#eText').value;
+  const p = parseWhen(raw);
+  const text = (p.matched ? p.text : raw).trim();
+  const when = readWhen();
+  if (!text) { toast('用件を書いてください'); $('#eText').focus(); return; }
+  if (!when) { toast('日付と時刻を決めてください'); return; }
+  const rep = readRepeat();
+
+  if (editing) {
+    const r = findReminder(editing);
+    if (r) {
+      r.text = text;
+      r.due = when;
+      r.snoozeUntil = 0;
+      r.lastAlert = 0;
+      r.repeat = rep;
+    }
+    toast('保存しました');
+  } else {
+    state.reminders.push({
+      id: uid(), text, due: when, repeat: rep,
+      snoozeUntil: 0, lastAlert: 0, createdAt: Date.now(),
+    });
+    playSound('add');
+    toast(`${whenLabel(when)}（${agoLabel(when)}）に知らせます`, 3200);
+  }
+  save(true);
+  closeModal();
+  editing = null;
+  go('#/');
+  render();
+}
+
+/* ---------- 「あとで」の選択 ---------- */
+function openSnooze(id) {
+  const r = findReminder(id);
+  if (!r) return;
+  const q = state.settings.quick;
+  const tomorrow9 = (() => { const d = startOfDay(new Date()); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d.getTime(); })();
+  const m = $('#modal');
+  m.className = '';
+  m.innerHTML = `
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="あとで">
+      <h3>あとで</h3>
+      <p>${esc(r.text)}</p>
+      <div class="chips">
+        ${q.map(n => `<button class="btn sm" data-act="sn" data-id="${esc(r.id)}" data-min="${n}">${n}分後</button>`).join('')}
+        <button class="btn sm" data-act="sn" data-id="${esc(r.id)}" data-min="180">3時間後</button>
+        <button class="btn sm" data-act="sn-at" data-id="${esc(r.id)}" data-at="${tomorrow9}">明日 9:00</button>
+      </div>
+      <div class="acts">
+        <button class="btn" data-act="ecancel">やめる</button>
+        <button class="btn primary" data-act="edit" data-id="${esc(r.id)}">時間を決める</button>
+      </div>
+    </div>`;
+  m.hidden = false;
+  m.onclick = e => { if (e.target === m) closeModal(); };
+}
+
+/* ---------- タイマーの編集 ---------- */
+function openTimerEditor(id) {
+  const t = id ? findTimer(id) : null;
+  const sec = t ? t.sec : 300;
+  const m = $('#modal');
+  m.className = '';
+  m.innerHTML = `
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="タイマー">
+      <h3>${t ? 'タイマー' : '新しいタイマー'}</h3>
+      <input class="txt-in" id="tText" type="text" placeholder="カップ麺" value="${esc(t ? t.text : '')}">
+      <label class="lbl">長さ</label>
+      <div class="chips">
+        <input class="num-in" type="number" id="tH" min="0" max="23" value="${Math.floor(sec / 3600)}"><span class="btn sm" style="pointer-events:none">時間</span>
+        <input class="num-in" type="number" id="tM" min="0" max="59" value="${Math.floor((sec % 3600) / 60)}"><span class="btn sm" style="pointer-events:none">分</span>
+        <input class="num-in" type="number" id="tS" min="0" max="59" value="${sec % 60}"><span class="btn sm" style="pointer-events:none">秒</span>
+      </div>
+      <div class="acts">
+        ${t ? `<button class="btn danger" data-act="tdel" data-id="${esc(t.id)}">削除</button>`
+            : '<button class="btn" data-act="ecancel">やめる</button>'}
+        <button class="btn primary" data-act="tsave" data-id="${esc(t ? t.id : '')}">${t ? '保存' : '追加'}</button>
+      </div>
+    </div>`;
+  m.hidden = false;
+  m.onclick = e => { if (e.target === m) closeModal(); };
+  setTimeout(() => $('#tText').focus(), 30);
+}
+
+/* =========================================================
+   操作（画面全体で1か所にまとめて受ける）
+   ========================================================= */
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const id = btn.dataset.id || '';
+  const min = Number(btn.dataset.min || 0);
+
+  switch (act) {
+    case 'nav': closeModal(); go(btn.dataset.to); break;
+
+    /* ---- リマインダー ---- */
+    case 'add': openEditor(null); break;
+    case 'edit': closeModal(); openEditor(id); break;
+
+    case 'done': {
+      const r = findReminder(id);
+      if (!r) break;
+      const snap = Object.assign({}, r);
+      completeReminder(id);
+      const logId = state.log[0] ? state.log[0].id : '';
+      playSound('done');
+      buzz(20);
+      rerender();
+      toastUndo('完了：' + r.text, () => {
+        state.log = state.log.filter(x => x.id !== logId);
+        const cur = findReminder(snap.id);
+        if (cur) Object.assign(cur, snap); else state.reminders.push(snap);
+        save(true);
+        playSound('drop');
+        rerender();
+      });
+      break;
+    }
+
+    case 'later': openSnooze(id); break;
+
+    case 'sn': {
+      const r = snoozeReminder(id, min);
+      closeModal();
+      playSound('later');
+      rerender();
+      if (r) toast(`${min}分後（${whenLabel(r.snoozeUntil)}）に鳴らします`);
+      break;
+    }
+    case 'sn-at': {
+      const r = findReminder(id);
+      if (r) {
+        r.snoozeUntil = Number(btn.dataset.at);
+        r.lastAlert = 0;
+        save(true);
+      }
+      closeModal();
+      playSound('later');
+      rerender();
+      if (r) toast(`${whenLabel(r.snoozeUntil)} に鳴らします`);
+      break;
+    }
+
+    /* ---- アラーム帯 ---- */
+    case 'al-done': {
+      if (btn.dataset.kind === 't') {
+        const t = findTimer(id);
+        if (t) resetTimer(t);
+        playSound('done');
+      } else {
+        const r = findReminder(id);
+        if (r) { completeReminder(id); playSound('done'); }
+      }
+      buzz(20);
+      rerender();
+      break;
+    }
+    case 'al-snooze': {
+      snoozeReminder(id, min);
+      playSound('later');
+      rerender();
+      break;
+    }
+    case 'al-again': {
+      const t = findTimer(id);
+      if (t) { resetTimer(t); startTimer(t); toast(`${t.text} をもう一度`); }
+      rerender();
+      break;
+    }
+    case 'al-hide': {
+      alarmHidden = true;
+      renderAlarm(ringingList(), false);
+      break;
+    }
+    case 'al-snooze-all': {
+      const now = Date.now();
+      for (const r of state.reminders) if (isDue(r, now)) { r.snoozeUntil = now + min * 60000; r.lastAlert = 0; }
+      for (const t of state.timers) if (timerRinging(t, now)) resetTimer(t);
+      save(true);
+      playSound('later');
+      rerender();
+      toast(`まとめて ${min}分後に回しました`);
+      break;
+    }
+
+    /* ---- 入力シート ---- */
+    case 'q': {
+      if (btn.dataset.at === 'tonight') {
+        const d = startOfDay(new Date()); d.setHours(20, 0, 0, 0);
+        writeWhen(d.getTime() <= Date.now() ? d.getTime() + 86400000 : d.getTime());
+      } else if (btn.dataset.at === 'tomorrow') {
+        const d = startOfDay(new Date()); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0);
+        writeWhen(d.getTime());
+      } else {
+        writeWhen(Date.now() + min * 60000);
+      }
+      manualWhen = true;
+      showParsed();
+      break;
+    }
+    case 'esave': saveEditor(); break;
+    case 'ecancel': closeModal(); editing = null; break;
+    case 'edel': {
+      const r = findReminder(editing);
+      if (!r) { closeModal(); break; }
+      const ok = await confirmDialog({ title: '削除しますか？', body: r.text, ok: '削除する', danger: true });
+      if (!ok) { openEditor(r.id); break; }
+      state.reminders = state.reminders.filter(x => x.id !== r.id);
+      save(true);
+      closeModal();
+      editing = null;
+      playSound('drop');
+      render();
+      toast('削除しました');
+      break;
+    }
+
+    /* ---- 完了ログ ---- */
+    case 'restore': {
+      const r = restoreLog(id);
+      rerender();
+      if (r) toast('一覧に戻しました');
+      break;
+    }
+    case 'clearlog': {
+      const ok = await confirmDialog({
+        title: 'ログを空にしますか？', body: `完了した ${state.log.length}件の記録を消します。`,
+        ok: '空にする', danger: true,
+      });
+      if (!ok) break;
+      state.log = [];
+      save(true);
+      render();
+      toast('空にしました');
+      break;
+    }
+
+    /* ---- タイマー ---- */
+    case 'tadd': openTimerEditor(null); break;
+    case 'tedit': openTimerEditor(id); break;
+    case 'tstart': { const t = findTimer(id); if (t) { startTimer(t); playSound('add'); rerender(); } break; }
+    case 'tpause': { const t = findTimer(id); if (t) { pauseTimer(t); playSound('later'); rerender(); } break; }
+    case 'treset': { const t = findTimer(id); if (t) { resetTimer(t); rerender(); } break; }
+    case 'tsave': {
+      const text = $('#tText').value.trim() || 'タイマー';
+      const sec = clamp(
+        (Number($('#tH').value) || 0) * 3600 + (Number($('#tM').value) || 0) * 60 + (Number($('#tS').value) || 0),
+        1, 24 * 3600);
+      const t = findTimer(id);
+      if (t) { t.text = text; t.sec = sec; resetTimer(t); }
+      else state.timers.push({ id: uid(), text, sec, endAt: 0, rest: 0, lastAlert: 0 });
+      save(true);
+      closeModal();
+      go('#/timers');
+      render();
+      toast(t ? '保存しました' : `${text}（${lenLabel(sec)}）を追加しました`);
+      break;
+    }
+    case 'tdel': {
+      const t = findTimer(id);
+      if (!t) { closeModal(); break; }
+      const ok = await confirmDialog({ title: '削除しますか？', body: t.text, ok: '削除する', danger: true });
+      if (!ok) { openTimerEditor(t.id); break; }
+      state.timers = state.timers.filter(x => x.id !== t.id);
+      save(true);
+      closeModal();
+      playSound('drop');
+      render();
+      toast('削除しました');
+      break;
+    }
+
+    /* ---- 設定 ---- */
+    case 'autosnooze': {
+      state.settings.autoSnooze = min;
+      save(true);
+      rerender();
+      toast(`${min}分おきに鳴り直します`);
+      break;
+    }
+    case 'sound': {
+      state.settings.sound = !state.settings.sound;
+      save(true);
+      if (state.settings.sound) playSound('done');
+      rerender();
+      toast(state.settings.sound ? '音を鳴らします' : '音を鳴らしません（アラームは鳴ります）');
+      break;
+    }
+    case 'style': {
+      state.settings.soundStyle = btn.dataset.style === 'pico' ? 'pico' : 'bell';
+      save(true);
+      const was = state.settings.sound;
+      state.settings.sound = true;
+      playSound('done');
+      state.settings.sound = was;
+      rerender();
+      break;
+    }
+    case 'testalarm': playAlarm(); buzz([220, 120, 220]); break;
+    case 'notifyperm': await askNotifyPermission(); break;
+    case 'keepawake': {
+      state.settings.keepAwake = !state.settings.keepAwake;
+      save(true);
+      if (state.settings.keepAwake) {
+        await acquireWakeLock();
+        toast('wakeLock' in navigator ? '画面を消しません' : 'この端末は非対応です');
+      } else {
+        await releaseWakeLock();
+        toast('通常どおり画面を消します');
+      }
+      rerender();
+      break;
+    }
+    case 'export': exportJSON(); break;
+    case 'import': importJSON(); break;
+    case 'wipe': {
+      const ok1 = await confirmDialog({
+        title: '全データを消去',
+        body: 'リマインダー・タイマー・ログがすべて消え、初期状態に戻ります。\n先にJSONへ書き出しておくことを強くおすすめします。',
+        ok: '次へ', danger: true,
+      });
+      if (!ok1) break;
+      const ok2 = await confirmDialog({ title: '本当に消しますか？', body: '取り消せません。', ok: '消去する', danger: true });
+      if (!ok2) break;
+      state = defaultData();
+      save(true);
+      go('#/');
+      render();
+      toast('初期状態に戻しました');
+      break;
+    }
+  }
+});
+
+/* 設定画面の「あとで」の分数 */
+main.addEventListener('input', (e) => {
+  const el = e.target.closest('[data-quick]');
+  if (!el) return;
+  const i = Number(el.dataset.quick);
+  const n = clamp(Math.round(Number(el.value) || 1), 1, 1440);
+  state.settings.quick[i] = n;
+  save();
+});
+
+/* Escape で入力シートを閉じる */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#modal').hidden) { closeModal(); editing = null; }
+});
+
+/* iOS は最初に画面を触るまで音を出せない。1回目のタップで音の準備をしておく */
+addEventListener('pointerdown', () => ensureAudio(), { once: true });
+addEventListener('keydown', () => ensureAudio(), { once: true });
+
+/* =========================================================
+   バックアップ（書き出し / 読み込み）
+   ========================================================= */
+function exportJSON() {
+  save(true);
+  const now = new Date();
+  const name = `due-backup-${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}-${pad2(now.getHours())}${pad2(now.getMinutes())}.json`;
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast('書き出しました：' + name, 4000);
+}
+
+function importJSON() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'application/json,.json';
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    let obj;
+    try { obj = JSON.parse(await file.text()); }
+    catch (e) { toast('JSONとして読めませんでした'); return; }
+    if (!isValidData(obj)) { toast('このアプリのバックアップではないようです'); return; }
+    const n = normalize(obj);
+    const ok = await confirmDialog({
+      title: '読み込みますか？',
+      body: `リマインダー ${n.reminders.length}件／タイマー ${n.timers.length}件／ログ ${n.log.length}件\n\n今この端末にあるデータは置き換わります。`,
+      ok: '読み込む', danger: true,
+    });
+    if (!ok) return;
+    state = n;
+    pruneLog();
+    save(true);
+    go('#/');
+    render();
+    toast('読み込みました');
+  };
+  inp.click();
+}
+
+/* =========================================================
+   Service Worker（オフライン動作）
+   ========================================================= */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('./sw.js');
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            const el = $('#toast');
+            el.innerHTML = '新しいバージョンがあります<button type="button" id="doUpdate">更新</button>';
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            $('#doUpdate').onclick = () => {
+              navigator.serviceWorker.addEventListener('controllerchange', () => location.reload(), { once: true });
+              nw.postMessage('skip-waiting');
+            };
+          }
+        });
+      });
+    } catch (e) { /* オフライン等。無視 */ }
+  });
+}
+
+/* =========================================================
+   起動
+   ========================================================= */
+state = load();
+pruneLog();
+save(true);
+render();
+tick();
+setInterval(tick, TICK_MS);
+acquireWakeLock();
+})();
+</script>
+</body>
+</html>
